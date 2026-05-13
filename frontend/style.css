@@ -87,8 +87,22 @@ button:disabled {
 
 #filename {
     font-weight: bold;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.processing-info {
+    background-color: #e8f5e8;
+    border: 1px solid #4caf50;
+    border-radius: 4px;
+    padding: 10px;
     margin-bottom: 20px;
     text-align: center;
+    font-size: 14px;
+}
+
+.processing-info strong {
+    color: #2e7d32;
 }
 
 .error {

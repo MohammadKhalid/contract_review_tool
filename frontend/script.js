@@ -46,6 +46,23 @@ document.addEventListener('DOMContentLoaded', function() {
         // Display filename
         document.getElementById('filename').textContent = `File: ${data.filename}`;
 
+        // Display processing information
+        const processingInfo = document.getElementById('processingInfo');
+        let ocrText = '';
+        if (data.ocr_used === 'primary') {
+            ocrText = ' (OCR used for scanned document)';
+        } else if (data.ocr_used === 'fallback') {
+            ocrText = ' (OCR used as fallback)';
+        } else {
+            ocrText = ' (Direct text extraction)';
+        }
+
+        processingInfo.innerHTML = `
+            <strong>Contract ID:</strong> ${data.contract_id} |
+            <strong>Processing Method:</strong> ${data.processing_method}${ocrText} |
+            <strong>Processing Time:</strong> ${data.processing_time_seconds}s
+        `;
+
         // Display basic statistics
         const stats = data.analysis;
         document.getElementById('stats').innerHTML = `

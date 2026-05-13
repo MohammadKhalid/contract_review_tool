@@ -1,15 +1,19 @@
 # German Rental Contract Review Tool
 
-A web application for analyzing German rental contracts using AI. The tool extracts key information, identifies potential issues, and provides basic contract analysis.
+A comprehensive web application for analyzing German rental contracts using AI. The tool features OCR capabilities for scanned documents, intelligent text processing, and persistent data storage.
 
 ## Features
 
+- **OCR Pipeline**: Automatically detects and processes scanned PDF documents using Tesseract OCR with German language support
+- **Smart Text Extraction**: Intelligently chooses between direct text extraction and OCR based on document type
 - **PDF and Text File Support**: Upload German rental contracts in PDF or text format
-- **German Language Processing**: Uses spaCy with German language model for text analysis
+- **German Language Processing**: Uses spaCy with German language model for advanced text analysis
 - **Key Term Detection**: Identifies important rental contract terms (Miete, Kaution, Kündigung, etc.)
-- **Named Entity Recognition**: Extracts names, dates, and other entities from contracts
+- **Named Entity Recognition**: Extracts names, dates, addresses, and other entities from contracts
 - **Basic Issue Detection**: Flags potential problems like excessive security deposits
-- **Docker Containerization**: Easy deployment on any machine
+- **PostgreSQL Database**: Persistent storage of all contracts and analysis results
+- **Contract History**: View and manage previously analyzed contracts
+- **Docker Containerization**: Easy deployment on any machine with full container orchestration
 
 ## Architecture
 
@@ -75,18 +79,58 @@ cd frontend
 python -m http.server 8000
 ```
 
+## OCR Pipeline
+
+The application includes an intelligent OCR pipeline that can handle both text-based and scanned PDF documents:
+
+1. **Document Type Detection**: Automatically detects if a PDF contains extractable text
+2. **Smart Processing**:
+   - **Text PDFs**: Direct text extraction using PyPDF2 (faster, more accurate)
+   - **Scanned PDFs**: OCR processing using Tesseract with German language support
+   - **Fallback**: If direct extraction fails, automatically falls back to OCR
+3. **German Language Support**: OCR is optimized for German text recognition
+
+## Database Schema
+
+The application uses PostgreSQL to store all contract data and analysis results:
+
+### Tables
+
+- **contracts**: Stores contract metadata
+  - `id`, `filename`, `file_path`, `file_size`, `mime_type`, `upload_date`, `processing_method`
+
+- **contract_analyses**: Stores analysis results for each contract
+  - `id`, `contract_id`, `analysis_date`, `extracted_text`, `word_count`, `sentence_count`
+  - `key_terms` (JSON), `named_entities` (JSON), `potential_issues` (JSON)
+  - `processing_time_seconds`, `ocr_used`
+
 ## API Endpoints
+
+### Core Endpoints
 
 - `GET /health` - Health check endpoint
 - `POST /analyze` - Analyze uploaded contract file
   - Accepts: `multipart/form-data` with `file` field
-  - Returns: JSON with analysis results
+  - Supports: PDF and TXT files
+  - Features: Automatic OCR for scanned PDFs
+  - Returns: JSON with analysis results, processing metadata, and database ID
+
+### Contract Management
+
+- `GET /contracts` - List analyzed contracts
+  - Query parameters: `skip`, `limit` for pagination
+  - Returns: List of contracts with latest analysis summary
+
+- `GET /contracts/{contract_id}` - Get detailed contract information
+  - Returns: Full contract details with all analyses and extracted text preview
 
 ## Technologies Used
 
-- **Backend**: Python, FastAPI, spaCy (German model), PyPDF2
+- **Backend**: Python, FastAPI, SQLAlchemy, PostgreSQL, spaCy (German model), PyPDF2
+- **OCR**: Tesseract OCR with German language support, pdf2image, Pillow
 - **Frontend**: HTML, CSS, JavaScript (Vanilla)
 - **Containerization**: Docker, Docker Compose
+- **Database**: PostgreSQL with SQLAlchemy ORM
 - **NLP**: spaCy with de_core_news_sm model
 
 ## Future Enhancements
