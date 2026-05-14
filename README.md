@@ -27,6 +27,26 @@ A comprehensive web application for analyzing German rental contracts using AI. 
 
 - Docker and Docker Compose installed on your system
 
+### Environment Setup
+
+1. Copy the environment template:
+
+   ```bash
+   cp .env_template .env
+   ```
+
+2. Edit `.env` with your desired database credentials:
+
+   ```bash
+   # Database Configuration
+   POSTGRES_DB=contract_db
+   POSTGRES_USER=your_db_username
+   POSTGRES_PASSWORD=your_secure_password
+
+   # Application Environment
+   ENV=development
+   ```
+
 ### Running the Application
 
 1. Clone the repository:
