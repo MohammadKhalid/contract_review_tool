@@ -220,3 +220,5 @@ __marimo__/
 backend/uploads/
 uploads/
 *.pdf
+
+.DS_Store
