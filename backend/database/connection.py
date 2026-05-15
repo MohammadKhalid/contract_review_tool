@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -29,8 +29,19 @@ def get_db():
 
 def create_tables():
     """Create all database tables"""
+    # Enable pgvector extension
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        conn.commit()
+
     # Import models to register them with SQLAlchemy
     from models.contract import Contract, ContractAnalysis
+    from models.legal_kb import (
+        LegalSource,
+        LegalDocument,
+        LegalChunk,
+        InvalidClausePattern,
+    )
 
     Base.metadata.create_all(bind=engine)
     print("Database tables created successfully")

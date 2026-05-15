@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch('http://localhost:5001/analyze', {
+            const response = await fetch('http://localhost:5001/contracts/analyze', {
                 method: 'POST',
                 body: formData
             });

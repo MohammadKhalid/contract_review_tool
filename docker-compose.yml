@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     env_file:
       - .env
     volumes:
@@ -16,23 +16,24 @@ services:
       retries: 5
 
   backend:
-    build: ./backend
-    ports:
-      - "5001:5001"
-    volumes:
-      - ./backend:/app
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+     build: ./backend
+     ports:
+       - "5001:5001"
+     volumes:
+       - ./backend:/app
+       - huggingface_cache:/root/.cache
+     env_file:
+       - .env
+     environment:
+       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+     depends_on:
+       db:
+         condition: service_healthy
+     healthcheck:
+       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+       interval: 30s
+       timeout: 10s
+       retries: 3
 
   frontend:
     build: ./frontend
@@ -43,3 +44,4 @@ services:
 
 volumes:
   postgres_data:
+  huggingface_cache:
