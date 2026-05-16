@@ -1,125 +1,106 @@
 """
 Legal Knowledge Base API endpoints.
-Provides access to German rental law documents, vector search, and invalid clause detection.
+Thin router that delegates business logic to the legal KB service.
 """
 
-import logging
-from typing import List, Dict, Any, Optional
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
-from database.connection import get_db
-from models.legal_kb import LegalSource, LegalChunk
-from legal_kb.ingestion import (
-    ingest_seed_sources,
-    ingest_seed_documents,
-    ingest_seed_invalid_clauses,
-    get_kb_stats,
+from core.dependencies import get_db, get_embedding_service
+from core.exceptions import AppException, BadRequestException, NotFoundException
+from core.logging import get_logger
+from legal_kb.embeddings import EmbeddingService
+from schemas.legal_kb import (
+    InvalidClauseCheckResponse,
+    InvalidClausePattern,
+    KBStatsResponse,
+    SeedResponse,
+    SearchResponse,
 )
-from legal_kb.retrieval import (
-    search_legal_knowledge,
+from services.legal_kb_service import (
+    seed_knowledge_base,
+    get_statistics,
+    search_documents,
     get_invalid_clause_patterns,
-    check_clause_against_patterns,
-    get_legal_sources,
-    get_legal_documents,
-)
-from legal_kb.seed_data import (
-    get_seed_sources,
-    get_seed_documents,
-    get_seed_invalid_clauses,
+    check_clause,
+    get_sources,
+    get_documents,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/legal-kb", tags=["legal-knowledge-base"])
 
 
-@router.post("/seed")
-async def seed_legal_knowledge_base(db: Session = Depends(get_db)):
-    """
-    Initialize the legal knowledge base with German rental law content.
-    This should be run once after the application starts.
-    """
+@router.post(
+    "/seed",
+    response_model=SeedResponse,
+    summary="Initialize legal knowledge base",
+    description="Seed the legal knowledge base with German rental law content.",
+)
+async def seed_legal_knowledge_base(
+    db: Session = Depends(get_db),
+    embedding_service: EmbeddingService = Depends(get_embedding_service),
+):
+    """Initialize the legal knowledge base with German rental law content."""
     try:
-        logger.info("Starting legal knowledge base seeding...")
-
-        # Seed sources
-        source_ids = ingest_seed_sources(db)
-        sources_created = len(source_ids)
-        logger.info(f"Seeded {sources_created} legal sources")
-
-        # Seed documents
-        document_ids = ingest_seed_documents(db, source_ids)
-        documents_created = len(document_ids)
-        logger.info(f"Seeded {documents_created} legal documents")
-
-        # Seed invalid clause patterns
-        invalid_clause_ids = ingest_seed_invalid_clauses(db, source_ids)
-        invalid_clauses_created = len(invalid_clause_ids)
-        logger.info(f"Seeded {invalid_clauses_created} invalid clause patterns")
-
-        # Embeddings created during document ingestion
-        embeddings_created = db.query(LegalChunk).count()
-        logger.info(f"Generated embeddings for {embeddings_created} document chunks")
-
-        return {
-            "message": "Legal knowledge base seeded successfully",
-            "sources_created": sources_created,
-            "documents_created": documents_created,
-            "invalid_clauses_created": invalid_clauses_created,
-            "embeddings_created": embeddings_created,
-        }
-
+        return seed_knowledge_base(db, embedding_service)
     except Exception as e:
-        logger.error(f"Error seeding legal knowledge base: {e}")
+        logger.error("Error seeding legal knowledge base: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to seed legal knowledge base: {str(e)}"
         )
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    response_model=KBStatsResponse,
+    summary="Get legal KB statistics",
+)
 async def get_legal_kb_stats(db: Session = Depends(get_db)):
     """Get statistics about the legal knowledge base."""
     try:
-        stats = get_kb_stats(db)
-        return stats
-
+        return get_statistics(db)
     except Exception as e:
-        logger.error(f"Error getting legal KB stats: {e}")
+        logger.error("Error getting legal KB stats: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to get legal KB stats: {str(e)}"
         )
 
 
-@router.post("/search")
+@router.post(
+    "/search",
+    response_model=SearchResponse,
+    summary="Search legal documents",
+    description="Perform semantic search over legal documents using vector similarity.",
+)
 async def search_legal_documents(
     query: str = Query(..., description="Search query for legal documents"),
     limit: int = Query(10, description="Maximum number of results to return"),
     db: Session = Depends(get_db),
 ):
-    """
-    Perform semantic search over legal documents using vector similarity.
-    Returns relevant legal sections and their similarity scores.
-    """
+    """Perform semantic search over legal documents."""
     try:
         if not query or not query.strip():
-            raise HTTPException(status_code=400, detail="Query cannot be empty")
-
-        results = search_legal_knowledge(db, query, limit)
-        return results
-
-    except HTTPException:
-        raise
+            raise BadRequestException("Query cannot be empty")
+        return search_documents(db, query, limit)
+    except BadRequestException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error searching legal documents: {e}")
+        logger.error("Error searching legal documents: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to search legal documents: {str(e)}"
         )
 
 
-@router.get("/invalid-clauses")
-async def get_invalid_clause_patterns(
+@router.get(
+    "/invalid-clauses",
+    summary="Get invalid clause patterns",
+    description="Get list of known invalid clause patterns, optionally filtered.",
+)
+async def get_invalid_clause_patterns_endpoint(
     topic: Optional[str] = Query(
         None, description="Filter by topic (e.g., 'Kaution', 'Kündigung')"
     ),
@@ -130,60 +111,63 @@ async def get_invalid_clause_patterns(
 ):
     """Get list of known invalid clause patterns."""
     try:
-        patterns = get_invalid_clause_patterns(db, topic, risk_level)
-        return {"patterns": patterns}
-
+        return get_invalid_clause_patterns(db, topic, risk_level)
     except Exception as e:
-        logger.error(f"Error getting invalid clause patterns: {e}")
+        logger.error("Error getting invalid clause patterns: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to get invalid clause patterns: {str(e)}"
         )
 
 
-@router.post("/check-clause")
+@router.post(
+    "/check-clause",
+    response_model=InvalidClauseCheckResponse,
+    summary="Check a clause against invalid patterns",
+    description="Check if a contract clause matches known invalid patterns.",
+)
 async def check_contract_clause(
     clause_text: str = Query(..., description="Contract clause text to check"),
     db: Session = Depends(get_db),
 ):
-    """
-    Check if a contract clause matches known invalid patterns.
-    Returns potential issues and legal references.
-    """
+    """Check if a contract clause matches known invalid patterns."""
     try:
         if not clause_text or not clause_text.strip():
-            raise HTTPException(status_code=400, detail="Clause text cannot be empty")
-
-        result = check_clause_against_patterns(db, clause_text)
-        return result
-
-    except HTTPException:
-        raise
+            raise BadRequestException("Clause text cannot be empty")
+        return check_clause(db, clause_text)
+    except BadRequestException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error checking contract clause: {e}")
+        logger.error("Error checking contract clause: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to check contract clause: {str(e)}"
         )
 
 
-@router.get("/sources")
-async def get_legal_sources(
+@router.get(
+    "/sources",
+    summary="Get legal sources",
+    description="Get list of legal sources, optionally filtered by type.",
+)
+async def get_legal_sources_endpoint(
     source_type: Optional[str] = Query(None, description="Filter by source type"),
     db: Session = Depends(get_db),
 ):
     """Get list of legal sources."""
     try:
-        sources = get_legal_sources(db, source_type)
-        return {"sources": sources}
-
+        return get_sources(db, source_type)
     except Exception as e:
-        logger.error(f"Error getting legal sources: {e}")
+        logger.error("Error getting legal sources: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to get legal sources: {str(e)}"
         )
 
 
-@router.get("/documents")
-async def get_legal_documents(
+@router.get(
+    "/documents",
+    summary="Get legal documents",
+    description="Get list of legal documents, optionally filtered.",
+)
+async def get_legal_documents_endpoint(
     category: Optional[str] = Query(None, description="Filter by category"),
     source_title: Optional[str] = Query(None, description="Filter by source title"),
     limit: int = Query(50, description="Maximum number of documents to return"),
@@ -191,25 +175,11 @@ async def get_legal_documents(
 ):
     """Get list of legal documents."""
     try:
-        if source_title:
-            source = (
-                db.query(LegalSource).filter(LegalSource.title == source_title).first()
-            )
-            if not source:
-                raise HTTPException(status_code=404, detail="Source not found")
-            source_id = source.id
-        else:
-            source_id = None
-
-        documents = get_legal_documents(
-            db, source_id=source_id, category=category, limit=limit
-        )
-        return {"documents": documents}
-
-    except HTTPException:
-        raise
+        return get_documents(db, category, source_title, limit)
+    except NotFoundException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Error getting legal documents: {e}")
+        logger.error("Error getting legal documents: %s", str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to get legal documents: {str(e)}"
         )

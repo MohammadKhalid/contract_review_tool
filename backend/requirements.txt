@@ -1,3 +1,4 @@
+pydantic-settings==2.1.0
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
@@ -14,3 +15,8 @@ pgvector==0.2.4
 sentence-transformers==2.2.2
 huggingface-hub==0.17.3
 numpy==1.24.3
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.27.2

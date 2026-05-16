@@ -1,6 +1,6 @@
 # German Rental Contract Review Tool
 
-An AI-powered application that analyzes German rental contracts (Mietverträge) to identify potentially invalid or problematic clauses using legal knowledge base and NLP techniques.
+An AI-powered application that analyzes German rental contracts (Mietverträge) to identify potentially invalid or problematic clauses using a legal knowledge base and NLP techniques.
 
 ## Features
 
@@ -12,13 +12,73 @@ An AI-powered application that analyzes German rental contracts (Mietverträge) 
 
 ## Technologies Used
 
-- **Backend**: Python, FastAPI, SQLAlchemy, PostgreSQL, spaCy (German model), PyPDF2
-- **OCR**: Tesseract OCR with German language support, pdf2image, Pillow
-- **Frontend**: HTML, CSS, JavaScript (Vanilla)
-- **Containerization**: Docker, Docker Compose
+### Backend
+
+- **Framework**: FastAPI (Python)
 - **Database**: PostgreSQL with pgvector extension for vector search
-- **NLP**: spaCy with de_core_news_sm model
-- **Embeddings**: sentence-transformers for semantic search
+- **ORM**: SQLAlchemy
+- **NLP**: spaCy (de_core_news_sm), sentence-transformers
+- **OCR**: Tesseract OCR with German language support, pdf2image, Pillow
+- **Validation**: Pydantic v2 + pydantic-settings for configuration
+
+### Frontend
+
+- HTML, CSS, JavaScript (Vanilla)
+
+### Devops
+
+- Docker, Docker Compose
+
+### Testing
+
+- pytest, pytest-asyncio, httpx (TestClient)
+
+## Architecture
+
+The backend follows a **clean layered architecture** with clear separation of concerns:
+
+```
+HTTP Request
+    │
+    ▼
+┌──────────────┐
+│   Routers    │  ← Thin HTTP layer: handles validation, routing, responses
+│  (routers/)  │
+└──────┬───────┘
+       │ delegates to
+       ▼
+┌──────────────┐
+│   Services   │  ← Business logic: PDF processing, NLP, issue detection, KB ops
+│  (services/) │
+└──────┬───────┘
+       │ uses
+       ▼
+┌──────────────┐
+│   Models /   │  ← Data layer: SQLAlchemy models, OCR utils, KB retrieval
+│   Legal KB   │
+│  (models/    │
+│   legal_kb/  │
+│   ocr_utils/ │
+└──────────────┘
+       │
+       ▼
+┌──────────────┐
+│  Core / DI   │  ← Config, dependencies, exceptions, logging
+│   (core/)    │
+└──────────────┘
+```
+
+### Layer Responsibilities
+
+| Layer        | Directory   | Responsibility                                                                                                                                       |
+| ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Core**     | `core/`     | Application configuration (`config.py`), dependency injection (`dependencies.py`), custom exceptions (`exceptions.py`), logging setup (`logging.py`) |
+| **Schemas**  | `schemas/`  | Pydantic request/response models for API validation and documentation                                                                                |
+| **Services** | `services/` | Business logic — contract analysis pipeline, legal KB operations                                                                                     |
+| **Routers**  | `routers/`  | Thin HTTP endpoints that delegate to services                                                                                                        |
+| **Models**   | `models/`   | SQLAlchemy ORM models for database tables                                                                                                            |
+| **Legal KB** | `legal_kb/` | Embedding generation, knowledge base ingestion, vector search retrieval                                                                              |
+| **Tests**    | `tests/`    | Unit and integration tests                                                                                                                           |
 
 ## Installation & Setup
 
@@ -88,21 +148,37 @@ curl -X POST http://localhost:5001/contracts/analyze \
 curl http://localhost:5001/legal-kb/stats
 ```
 
+**Semantic Search:**
+
+```bash
+curl -X POST "http://localhost:5001/legal-kb/search?query=Kaution%20Rückzahlung"
+```
+
+**Check a Clause Against Invalid Patterns:**
+
+```bash
+curl -X POST "http://localhost:5001/legal-kb/check-clause?clause_text=Der%20Mieter%20leistet%20eine%20Kaution%20in%20Höhe%20von%20vier%20Monatsmieten."
+```
+
 ## API Endpoints
 
 ### Contract Endpoints
 
-- `POST /contracts/analyze` - Upload and analyze a contract PDF
+| Method | Endpoint             | Description                       |
+| ------ | -------------------- | --------------------------------- |
+| POST   | `/contracts/analyze` | Upload and analyze a contract PDF |
 
 ### Legal Knowledge Base Endpoints
 
-- `POST /legal-kb/seed` - Initialize legal knowledge base with German rental law content
-- `GET /legal-kb/stats` - Get statistics about the knowledge base
-- `POST /legal-kb/search` - Semantic search over legal documents
-- `GET /legal-kb/invalid-clauses` - List known invalid clause patterns
-- `POST /legal-kb/check-clause` - Check if a contract clause matches invalid patterns
-- `GET /legal-kb/sources` - List legal sources
-- `GET /legal-kb/documents` - Browse legal documents
+| Method | Endpoint                    | Description                                                    |
+| ------ | --------------------------- | -------------------------------------------------------------- |
+| POST   | `/legal-kb/seed`            | Initialize legal knowledge base with German rental law content |
+| GET    | `/legal-kb/stats`           | Get statistics about the knowledge base                        |
+| POST   | `/legal-kb/search`          | Semantic search over legal documents                           |
+| GET    | `/legal-kb/invalid-clauses` | List known invalid clause patterns (filterable by topic/risk)  |
+| POST   | `/legal-kb/check-clause`    | Check if a contract clause matches invalid patterns            |
+| GET    | `/legal-kb/sources`         | List legal sources                                             |
+| GET    | `/legal-kb/documents`       | Browse legal documents                                         |
 
 ## Legal Knowledge Base
 
@@ -116,20 +192,6 @@ The application includes a comprehensive German rental law knowledge base with v
 - **RAG Integration**: Contract analysis enhanced with legal knowledge retrieval
 - **Regular Updates**: Quarterly updates to keep legal content current
 
-### Setup
-
-1. **Seed the Knowledge Base** (run after first startup):
-
-   ```bash
-   curl -X POST http://localhost:5001/legal-kb/seed
-   ```
-
-2. **Check Knowledge Base Stats**:
-
-   ```bash
-   curl http://localhost:5001/legal-kb/stats
-   ```
-
 ### Sources
 
 The knowledge base includes content from:
@@ -139,42 +201,129 @@ The knowledge base includes content from:
 - **BGH Case Law**: Relevant court decisions on rental law
 - **Invalid Clause Patterns**: Curated examples of unenforceable contract clauses
 
+## Testing
+
+The backend includes a comprehensive test suite with **48 tests** covering both business logic and API endpoints.
+
+### Test Structure
+
+```
+backend/tests/
+├── conftest.py                   # Shared fixtures and mock objects
+├── test_contract_service.py      # 24 unit tests for contract analysis logic
+├── test_legal_kb_service.py      # 11 unit tests for legal KB operations
+├── test_routers_contracts.py     # 3 integration tests for contract endpoints
+└── test_routers_legal_kb.py      # 10 integration tests for legal KB endpoints
+```
+
+### Running Tests
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Install dependencies (including test dependencies)
+pip install -r requirements.txt
+
+# Run all tests with verbose output
+python -m pytest tests/ -v --tb=short
+
+# Run a specific test file
+python -m pytest tests/test_contract_service.py -v
+
+# Run tests matching a keyword
+python -m pytest tests/ -k "validate_pdf"
+
+# Run with coverage report
+pip install pytest-cov
+python -m pytest tests/ --cov=services --cov=routers --cov=core --cov-report=term-missing
+```
+
+### What's Tested
+
+| Test File                   | Tests | Key Scenarios                                                                                                                          |
+| --------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_contract_service.py`  | 24    | PDF validation, clause splitting, spaCy analysis, key term matching, entity extraction, legal issue detection, deduplication, file I/O |
+| `test_legal_kb_service.py`  | 11    | Statistics, pattern filtering, clause checking, source/document retrieval, not-found handling                                          |
+| `test_routers_contracts.py` | 3     | Successful analysis response format, non-PDF rejection, internal error handling                                                        |
+| `test_routers_legal_kb.py`  | 10    | All 7 endpoints: seed, stats, search, invalid-clauses, check-clause, sources, documents                                                |
+
 ## Environment Configuration
 
 Required environment variables (see `.env_template`):
 
-- `POSTGRES_USER` - Database username
-- `POSTGRES_PASSWORD` - Database password
-- `POSTGRES_DB` - Database name
-- `DATABASE_URL` - Full database connection string
+| Variable            | Description                     |
+| ------------------- | ------------------------------- |
+| `POSTGRES_USER`     | Database username               |
+| `POSTGRES_PASSWORD` | Database password               |
+| `POSTGRES_DB`       | Database name                   |
+| `DATABASE_URL`      | Full database connection string |
+
+Optional configuration via environment variables (defaults in `backend/core/config.py`):
+
+| Variable                      | Default                               | Description                          |
+| ----------------------------- | ------------------------------------- | ------------------------------------ |
+| `APP_TITLE`                   | German Rental Contract Review API     | Application name                     |
+| `SPACY_MODEL`                 | de_core_news_sm                       | spaCy NLP model                      |
+| `EMBEDDING_MODEL`             | paraphrase-multilingual-MiniLM-L12-v2 | Sentence transformer model           |
+| `VECTOR_SIMILARITY_THRESHOLD` | 0.7                                   | Minimum similarity for vector search |
+| `LOG_LEVEL`                   | INFO                                  | Logging level                        |
+| `MAX_ISSUES`                  | 10                                    | Maximum legal issues to report       |
 
 ## Project Structure
 
 ```
 contract_review_tool/
 ├── backend/
-│   ├── app.py                 # FastAPI application entry point
-│   ├── ocr_utils.py           # OCR and PDF processing utilities
-│   ├── requirements.txt       # Python dependencies
+│   ├── app.py                   # FastAPI application entry point
+│   ├── ocr_utils.py             # OCR and PDF processing utilities
+│   ├── requirements.txt         # Python dependencies
 │   ├── Dockerfile
+│   │
+│   ├── core/                    # Core configuration & utilities
+│   │   ├── config.py            # Pydantic-settings for environment variables
+│   │   ├── dependencies.py      # FastAPI dependency injection (DB, NLP, embeddings)
+│   │   ├── exceptions.py        # Custom exception hierarchy
+│   │   └── logging.py           # Centralized logging setup
+│   │
+│   ├── schemas/                 # Pydantic request/response models
+│   │   ├── contract.py          # Contract analysis schemas
+│   │   └── legal_kb.py          # Legal KB schemas
+│   │
+│   ├── services/                # Business logic layer
+│   │   ├── contract_service.py  # PDF processing, NLP, issue detection
+│   │   └── legal_kb_service.py  # KB seeding, search, clause checking
+│   │
+│   ├── routers/                 # Thin API layer (delegates to services)
+│   │   ├── contracts.py         # Contract analysis endpoints
+│   │   └── legal_kb.py          # Legal KB endpoints
+│   │
 │   ├── database/
-│   │   └── connection.py      # Database connection and setup
+│   │   └── connection.py        # Database connection and setup
+│   │
 │   ├── models/
-│   │   ├── contract.py        # Contract and analysis models
-│   │   └── legal_kb.py        # Legal knowledge base models
+│   │   ├── contract.py          # Contract and analysis SQLAlchemy models
+│   │   └── legal_kb.py          # Legal knowledge base SQLAlchemy models
+│   │
 │   ├── legal_kb/
-│   │   ├── embeddings.py      # Vector embeddings
-│   │   ├── ingestion.py       # Knowledge base ingestion
-│   │   ├── retrieval.py       # Semantic search and retrieval
-│   │   └── seed_data.py       # Initial legal content
-│   └── routers/
-│       ├── contracts.py       # Contract analysis endpoints
-│       └── legal_kb.py        # Legal KB endpoints
+│   │   ├── embeddings.py        # Vector embedding generation
+│   │   ├── ingestion.py         # Knowledge base ingestion
+│   │   ├── retrieval.py         # Semantic search and retrieval
+│   │   └── seed_data.py         # Initial legal content
+│   │
+│   └── tests/                   # Test suite (48 tests)
+│       ├── conftest.py          # Shared fixtures and mocks
+│       ├── test_contract_service.py
+│       ├── test_legal_kb_service.py
+│       ├── test_routers_contracts.py
+│       └── test_routers_legal_kb.py
+│
 ├── frontend/
 │   ├── index.html
 │   ├── script.js
 │   ├── style.css
 │   └── Dockerfile
+│
 ├── docker-compose.yml
 └── README.md
 ```

@@ -1,12 +1,14 @@
+import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+
+DB = os.getenv("POSTGRES_DB", None)
+USERNAME = os.getenv("POSTGRES_USER", "user")
+PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
 
 # Database URL from environment variables
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://user:password@db:5432/contract_db"
-)
+DATABASE_URL = f"postgresql://{USERNAME}:{PASSWORD}@db:5432/{DB}"
 
 # Create engine
 engine = create_engine(DATABASE_URL, echo=False)
