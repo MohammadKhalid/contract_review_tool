@@ -27,6 +27,7 @@
     "selectedFile": "Ausgewählte Datei: {filename}",
     "analyze": "Mietvertrag analysieren",
     "analyzing": "Analysiere Mietvertrag...",
+    "analyzingDescription": "Text extrahieren, Klauseln analysieren und rechtliche Muster prüfen...",
     "analyzingNote": "Dies kann einige Minuten dauern",
     "fileTypes": "Nur PDF- und TXT-Dateien (max. 50 MB)",
     "error": {

@@ -7,13 +7,21 @@ import FileUpload from '@/components/FileUpload';
 import ResultsDisplay from '@/components/ResultsDisplay';
 import { analyzeContract, ApiError } from '@/lib/api';
 import type { ContractAnalysisResponse, UploadState } from '@/types/contract';
+import {
+  getAnalysisState,
+  setAnalysisPending,
+  setAnalysisSuccess,
+  setAnalysisError,
+  resetAnalysis,
+  setFileName,
+} from '@/lib/analysisStore';
 
-const STORAGE_KEY = 'contract_analysis_results';
+const RESULTS_KEY = 'contract_analysis_results';
 
 function loadSavedResults(): ContractAnalysisResponse | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(RESULTS_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -22,30 +30,62 @@ function loadSavedResults(): ContractAnalysisResponse | null {
 
 function saveResults(results: ContractAnalysisResponse) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
+    localStorage.setItem(RESULTS_KEY, JSON.stringify(results));
   } catch { /* ignore */ }
 }
 
 function clearResults() {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(RESULTS_KEY);
   } catch { /* ignore */ }
 }
 
 export default function HomePage() {
   const t = useTranslations();
   const tFeatures = useTranslations('app.features');
-  const [uploadState, setUploadState] = useState<UploadState>('idle');
+
+  // Initialize from module-level store first, then fall back to localStorage
+  const store = getAnalysisState();
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [results, setResults] = useState<ContractAnalysisResponse | null>(loadSavedResults);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(store.fileName || null);
+  const [results, setResults] = useState<ContractAnalysisResponse | null>(store.results || loadSavedResults);
+  const [error, setError] = useState<string | null>(store.error || null);
+  const [uploadState, setUploadState] = useState<UploadState>(store.state);
+
+  // On mount: if store says analyzing, wait for the promise to complete
+  useEffect(() => {
+    const currentState = getAnalysisState();
+    if (currentState.state === 'analyzing' && currentState.promise) {
+      // Already analyzing — promise will update store when done
+      // We need to poll or listen for the store to change
+      const interval = setInterval(() => {
+        const s = getAnalysisState();
+        if (s.state !== 'analyzing') {
+          clearInterval(interval);
+          setUploadState(s.state);
+          if (s.results) {
+            setResults(s.results);
+            saveResults(s.results);
+          }
+          if (s.error) {
+            setError(s.error);
+          }
+        }
+      }, 200);
+      return () => clearInterval(interval);
+    }
+  }, []);
 
   const handleFileSelect = useCallback((file: File) => {
     setSelectedFile(file);
+    setSelectedFileName(file.name);
+    setFileName(file.name);
     setError(null);
     setResults(null);
-    setUploadState('idle');
     clearResults();
+    resetAnalysis();
+    setUploadState('idle');
   }, []);
 
   const handleAnalyze = useCallback(async () => {
@@ -54,28 +94,38 @@ export default function HomePage() {
     setUploadState('analyzing');
     setError(null);
 
+    const promise = analyzeContract(selectedFile);
+
+    // Store the pending analysis in module-level store
+    setAnalysisPending(selectedFile.name, promise);
+
     try {
-      const data = await analyzeContract(selectedFile);
+      const data = await promise;
       setResults(data);
       saveResults(data);
+      setAnalysisSuccess(data);
       setUploadState('success');
     } catch (err) {
+      let message: string;
       if (err instanceof ApiError) {
-        setError(err.message);
+        message = err.message;
       } else {
-        const message = err instanceof Error ? err.message : t('errors.general');
-        setError(message);
+        message = err instanceof Error ? err.message : t('errors.general');
       }
+      setError(message);
+      setAnalysisError(message);
       setUploadState('error');
     }
   }, [selectedFile, t]);
 
   const handleReset = useCallback(() => {
     setSelectedFile(null);
+    setSelectedFileName(null);
     setResults(null);
     setError(null);
-    setUploadState('idle');
     clearResults();
+    resetAnalysis();
+    setUploadState('idle');
   }, []);
 
   // If we have results, show them
@@ -86,6 +136,8 @@ export default function HomePage() {
       </div>
     );
   }
+
+  const showAnalyzing = uploadState === 'analyzing';
 
   return (
     <div className="flex flex-col items-center">
@@ -145,9 +197,11 @@ export default function HomePage() {
             onFileSelect={handleFileSelect}
             disabled={uploadState === 'analyzing'}
             selectedFile={selectedFile}
+            selectedFileName={selectedFileName}
           />
 
-          {selectedFile && uploadState !== 'analyzing' && (
+          {/* Show "Analyze" button only when a real File object exists and not analyzing */}
+          {selectedFile && !showAnalyzing && (
             <div className="flex justify-center mt-8 animate-fade-in">
               <button
                 onClick={handleAnalyze}
@@ -159,21 +213,31 @@ export default function HomePage() {
             </div>
           )}
 
-          {uploadState === 'analyzing' && (
+          {/* Show re-select message when filename exists but File is missing (after language change) and not analyzing */}
+          {!selectedFile && selectedFileName && !showAnalyzing && (
+            <div className="flex justify-center mt-8 animate-fade-in">
+              <p className="text-sm text-yellow-400 bg-yellow-900/20 rounded-xl px-4 py-3 border border-yellow-800/30 text-center max-w-md">
+                Previously selected: {selectedFileName}. Please re-select the file to analyze.
+              </p>
+            </div>
+          )}
+
+          {/* Show analyzing state */}
+          {showAnalyzing && (
             <div className="flex flex-col items-center mt-8 animate-fade-in">
               <div className="w-16 h-16 rounded-2xl bg-blue-900/30 flex items-center justify-center mb-4">
                 <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
               </div>
               <p className="text-gray-300 font-medium">{t('upload.analyzing')}</p>
               <p className="text-sm text-gray-500 mt-1">
-                Extracting text, analyzing clauses, and checking legal patterns...
+                {t('upload.analyzingDescription')}
               </p>
               <p className="text-xs text-gray-400 mt-2">{t('upload.analyzingNote')}</p>
             </div>
           )}
 
-          {/* Error display */}
-          {error && (
+          {/* Show error state */}
+          {uploadState === 'error' && error && (
             <div className="mt-6 p-4 bg-red-900/30 rounded-xl border border-red-800/40 animate-fade-in">
               <p className="text-sm text-red-300">{error}</p>
             </div>

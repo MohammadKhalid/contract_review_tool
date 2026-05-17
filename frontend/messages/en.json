@@ -27,6 +27,7 @@
     "selectedFile": "Selected file: {filename}",
     "analyze": "Analyze Contract",
     "analyzing": "Analyzing contract...",
+    "analyzingDescription": "Extracting text, analyzing clauses, and checking legal patterns...",
     "analyzingNote": "This may take a few minutes",
     "fileTypes": "PDF and TXT files only (max. 50 MB)",
     "error": {

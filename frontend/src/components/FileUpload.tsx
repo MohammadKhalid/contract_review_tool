@@ -8,9 +8,10 @@ interface FileUploadProps {
   onFileSelect: (file: File) => void;
   disabled?: boolean;
   selectedFile?: File | null;
+  selectedFileName?: string | null;
 }
 
-export default function FileUpload({ onFileSelect, disabled, selectedFile }: FileUploadProps) {
+export default function FileUpload({ onFileSelect, disabled, selectedFile, selectedFileName }: FileUploadProps) {
   const t = useTranslations('upload');
   const [isDragActive, setIsDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,16 +105,18 @@ export default function FileUpload({ onFileSelect, disabled, selectedFile }: Fil
         />
 
         <div className="flex flex-col items-center gap-4 text-center">
-          {selectedFile ? (
+          {selectedFile || selectedFileName ? (
             <>
               <div className="w-16 h-16 rounded-2xl bg-green-900/40 flex items-center justify-center animate-fade-in">
                 <CheckCircle2 className="w-8 h-8 text-green-400" />
               </div>
               <div>
-                <p className="font-medium text-gray-200">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+                <p className="font-medium text-gray-200">{selectedFile?.name || selectedFileName}</p>
+                {selectedFile && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                )}
               </div>
             </>
           ) : isDragActive ? (
