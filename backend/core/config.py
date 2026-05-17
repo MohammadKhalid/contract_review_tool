@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     DB = os.getenv("POSTGRES_DB", None)
     USERNAME = os.getenv("POSTGRES_USER", "user")
     PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
-    DATABASE_URL: str = "postgresql://user:password@db:5432/contract_db"
+    DATABASE_URL = f"postgresql://{USERNAME}:{PASSWORD}@db:5432/{DB}"
     DATABASE_ECHO: bool = False
 
     # CORS
