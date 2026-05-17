@@ -4,21 +4,30 @@ Centralizes all environment variables and application constants.
 """
 
 import os
+from typing import List, Optional
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
-from typing import List
 
 
 class Settings(BaseSettings):
     # Application
-    APP_TITLE: str = "German Rental Contract Review API"
+    APP_TITLE: str = Field(
+        default="German Rental Contract Review API", alias="APP_TITLE"
+    )
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
     # Database
-    DB = os.getenv("POSTGRES_DB", None)
-    USERNAME = os.getenv("POSTGRES_USER", "user")
-    PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
-    DATABASE_URL = f"postgresql://{USERNAME}:{PASSWORD}@db:5432/{DB}"
+    # You can either set DATABASE_URL directly, or set the individual components
+    # (POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD) to auto-construct it.
+    POSTGRES_DB: Optional[str] = Field(default=None, alias="POSTGRES_DB")
+    POSTGRES_USER: Optional[str] = Field(default=None, alias="POSTGRES_USER")
+    POSTGRES_PASSWORD: Optional[str] = Field(default=None, alias="POSTGRES_PASSWORD")
+    DATABASE_URL: str = Field(
+        default=None,
+        alias="DATABASE_URL",
+    )
     DATABASE_ECHO: bool = False
 
     # CORS
@@ -56,10 +65,26 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
+    @model_validator(mode="after")
+    def build_database_url(self) -> "Settings":
+        """
+        If DATABASE_URL is not explicitly provided (is the default placeholder),
+        construct it from POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD if set.
+        """
+        if self.POSTGRES_DB is not None:
+            user = self.POSTGRES_USER
+            password = self.POSTGRES_PASSWORD
+            self.DATABASE_URL = (
+                f"postgresql://{user}:{password}@db:5432/{self.POSTGRES_DB}"
+            )
+        return self
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
+        # Allow POPO field names to be used alongside aliases
+        "populate_by_name": True,
     }
 
 

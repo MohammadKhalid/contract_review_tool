@@ -1,14 +1,11 @@
-import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DB = os.getenv("POSTGRES_DB", None)
-USERNAME = os.getenv("POSTGRES_USER", "user")
-PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
+from core.config import settings
 
-# Database URL from environment variables
-DATABASE_URL = f"postgresql://{USERNAME}:{PASSWORD}@db:5432/{DB}"
+# Database URL from centralized configuration
+DATABASE_URL = settings.DATABASE_URL
 
 # Create engine
 engine = create_engine(DATABASE_URL, echo=False)
