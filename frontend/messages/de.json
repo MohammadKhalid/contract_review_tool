@@ -1,0 +1,80 @@
+{
+  "app": {
+    "title": "Mietvertrags-Prüfungstool",
+    "subtitle": "KI-gestützte Analyse deutscher Mietverträge auf ungültige Klauseln",
+    "description": "Laden Sie Ihren deutschen Mietvertrag hoch und lassen Sie ihn automatisch auf potenziell ungültige oder problematische Klauseln überprüfen.",
+    "legalNotice": "This tool provides legal information for educational purposes. It is not a substitute for professional legal advice. Always consult a qualified attorney for your specific situation.",
+    "features": {
+      "legal": {
+        "title": "Juristische Analyse",
+        "desc": "Automatische Erkennung potenziell ungültiger Klauseln basierend auf deutschem Mietrecht (BGB)"
+      },
+      "risk": {
+        "title": "Risikobewertung",
+        "desc": "Jedes Problem wird nach Risikostufe kategorisiert mit rechtlicher Grundlage und Ähnlichkeitsbewertung"
+      },
+      "ai": {
+        "title": "KI-gestützt",
+        "desc": "Fortschrittliche NLP- und Vektorsuche für eine umfassende Vertragsanalyse"
+      }
+    }
+  },
+  "upload": {
+    "title": "Mietvertrag hochladen",
+    "dragDrop": "PDF oder Textdatei hier ablegen oder zur Auswahl klicken",
+    "dragActive": "Datei ablegen zum Hochladen...",
+    "browse": "Datei auswählen",
+    "selectedFile": "Ausgewählte Datei: {filename}",
+    "analyze": "Mietvertrag analysieren",
+    "analyzing": "Analysiere Mietvertrag...",
+    "analyzingDescription": "Text extrahieren, Klauseln analysieren und rechtliche Muster prüfen...",
+    "analyzingNote": "Dies kann einige Minuten dauern",
+    "fileTypes": "Nur PDF- und TXT-Dateien (max. 50 MB)",
+    "error": {
+      "noFile": "Bitte wählen Sie eine Datei aus",
+      "invalidType": "Nur PDF- und TXT-Dateien werden unterstützt",
+      "tooLarge": "Datei ist zu groß. Maximal 10 MB erlaubt",
+      "uploadFailed": "Fehler beim Hochladen: {error}",
+      "networkError": "Netzwerkfehler. Bitte überprüfen Sie Ihre Verbindung."
+    }
+  },
+  "results": {
+    "title": "Analyseergebnisse",
+    "filename": "Datei: {filename}",
+    "processingInfo": "Verarbeitung: {method} | OCR: {ocr} | Dauer: {time}s",
+    "noIssues": "Keine potenziellen Probleme erkannt.",
+    "stats": {
+      "title": "Basisstatistiken",
+      "wordCount": "Wörter",
+      "sentences": "Sätze",
+      "keyTerms": "Schlüsselbegriffe",
+      "issues": "Probleme"
+    },
+    "issues": {
+      "title": "Potenzielle Probleme",
+      "count": "{count} Problem(e) gefunden",
+      "risk": {
+        "high": "Hohes Risiko",
+        "medium": "Mittleres Risiko",
+        "low": "Niedriges Risiko"
+      },
+      "legalBasis": "Rechtliche Grundlage",
+      "clauseSnippet": "Klausel-Auszug",
+      "similarity": "Ähnlichkeit: {score}%"
+    }
+  },
+  "language": {
+    "switch": "Sprache wechseln",
+    "en": "English",
+    "de": "Deutsch"
+  },
+  "footer": {
+    "copyright": "© {year} Mietvertrags-Prüfungstool",
+    "disclaimer": "Rechtlicher Hinweis: Dieses Tool bietet rechtliche Informationen zu Bildungszwecken. Es ist kein Ersatz für eine professionelle Rechtsberatung. Konsultieren Sie bei Fragen stets einen qualifizierten Rechtsanwalt."
+  },
+  "errors": {
+    "general": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+    "notFound": "Seite nicht gefunden",
+    "serverError": "Serverfehler. Der Dienst ist möglicherweise nicht verfügbar."
+  }
+}
