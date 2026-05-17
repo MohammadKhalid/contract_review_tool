@@ -3,7 +3,21 @@
     "title": "Mietvertrags-Prüfungstool",
     "subtitle": "KI-gestützte Analyse deutscher Mietverträge auf ungültige Klauseln",
     "description": "Laden Sie Ihren deutschen Mietvertrag hoch und lassen Sie ihn automatisch auf potenziell ungültige oder problematische Klauseln überprüfen.",
-    "legalNotice": "Dieses Tool dient ausschließlich zu Informationszwecken und ersetzt keine anwaltliche Beratung."
+    "legalNotice": "This tool provides legal information for educational purposes. It is not a substitute for professional legal advice. Always consult a qualified attorney for your specific situation.",
+    "features": {
+      "legal": {
+        "title": "Juristische Analyse",
+        "desc": "Automatische Erkennung potenziell ungültiger Klauseln basierend auf deutschem Mietrecht (BGB)"
+      },
+      "risk": {
+        "title": "Risikobewertung",
+        "desc": "Jedes Problem wird nach Risikostufe kategorisiert mit rechtlicher Grundlage und Ähnlichkeitsbewertung"
+      },
+      "ai": {
+        "title": "KI-gestützt",
+        "desc": "Fortschrittliche NLP- und Vektorsuche für eine umfassende Vertragsanalyse"
+      }
+    }
   },
   "upload": {
     "title": "Mietvertrag hochladen",
@@ -13,7 +27,8 @@
     "selectedFile": "Ausgewählte Datei: {filename}",
     "analyze": "Mietvertrag analysieren",
     "analyzing": "Analysiere Mietvertrag...",
-    "fileTypes": "Nur PDF- und TXT-Dateien (max. 10 MB)",
+    "analyzingNote": "Dies kann einige Minuten dauern",
+    "fileTypes": "Nur PDF- und TXT-Dateien (max. 50 MB)",
     "error": {
       "noFile": "Bitte wählen Sie eine Datei aus",
       "invalidType": "Nur PDF- und TXT-Dateien werden unterstützt",
@@ -30,26 +45,9 @@
     "stats": {
       "title": "Basisstatistiken",
       "wordCount": "Wörter",
-      "sentences": "Sätze"
-    },
-    "keyTerms": {
-      "title": "Gefundene Schlüsselbegriffe"
-    },
-    "entities": {
-      "title": "Erkannte Entitäten",
-      "table": {
-        "text": "Text",
-        "label": "Typ",
-        "person": "Person",
-        "org": "Organisation",
-        "money": "Betrag",
-        "date": "Datum",
-        "location": "Ort",
-        "other": "Sonstiges",
-        "law": "Gesetz",
-        "percent": "Prozent",
-        "gpe": "Ort"
-      }
+      "sentences": "Sätze",
+      "keyTerms": "Schlüsselbegriffe",
+      "issues": "Probleme"
     },
     "issues": {
       "title": "Potenzielle Probleme",

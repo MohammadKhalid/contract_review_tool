@@ -1,11 +1,10 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { useTransition } from 'react';
 
 export default function LanguageSwitcher() {
-  const t = useTranslations('language');
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
@@ -13,13 +12,15 @@ export default function LanguageSwitcher() {
 
   const switchLocale = (newLocale: string) => {
     startTransition(() => {
-      const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-      router.push(newPath);
+      const segments = pathname.split('/');
+      segments[1] = newLocale;
+      const newPath = segments.join('/');
+      router.replace(newPath, { scroll: false });
     });
   };
 
   return (
-    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5" role="radiogroup" aria-label={t('switch')}>
+    <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5" role="radiogroup" aria-label="Switch language">
       {(['de', 'en'] as const).map((lang) => (
         <button
           key={lang}
@@ -30,8 +31,8 @@ export default function LanguageSwitcher() {
           className={`
             px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200
             ${locale === lang
-              ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              ? 'bg-gray-700 text-white shadow-sm border border-gray-600/50'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
             }
             disabled:opacity-50 disabled:cursor-not-allowed
           `}

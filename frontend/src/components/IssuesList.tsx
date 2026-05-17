@@ -12,22 +12,22 @@ interface IssuesListProps {
 
 const riskConfig = {
   high: {
-    bg: 'bg-red-50 border-red-200',
-    badge: 'bg-red-100 text-red-700',
-    icon: 'text-red-500',
-    hover: 'hover:border-red-300',
+    bg: 'bg-red-950/30 border-red-800/30',
+    badge: 'bg-red-900/50 text-red-300 border-red-800/30',
+    icon: 'text-red-400',
+    hover: 'hover:border-red-700/50',
   },
   medium: {
-    bg: 'bg-amber-50 border-amber-200',
-    badge: 'bg-amber-100 text-amber-700',
-    icon: 'text-amber-500',
-    hover: 'hover:border-amber-300',
+    bg: 'bg-amber-950/30 border-amber-800/30',
+    badge: 'bg-amber-900/50 text-amber-300 border-amber-800/30',
+    icon: 'text-amber-400',
+    hover: 'hover:border-amber-700/50',
   },
   low: {
-    bg: 'bg-green-50 border-green-200',
-    badge: 'bg-green-100 text-green-700',
-    icon: 'text-green-500',
-    hover: 'hover:border-green-300',
+    bg: 'bg-green-950/30 border-green-800/30',
+    badge: 'bg-green-900/50 text-green-300 border-green-800/30',
+    icon: 'text-green-400',
+    hover: 'hover:border-green-700/50',
   },
 };
 
@@ -37,8 +37,8 @@ export default function IssuesList({ issues }: IssuesListProps) {
 
   if (issues.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500 animate-fade-in">
-        <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-green-400" />
+      <div className="text-center py-12 text-gray-400 animate-fade-in">
+        <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-green-500" />
         <p className="font-medium">{t('noIssues')}</p>
       </div>
     );
@@ -47,9 +47,9 @@ export default function IssuesList({ issues }: IssuesListProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 mb-4">
-        <AlertTriangle className="w-5 h-5 text-amber-500" />
-        <p className="text-sm font-medium text-gray-700">
-          {t('count', { count: issues.length })}
+        <AlertTriangle className="w-5 h-5 text-amber-400" />
+        <p className="text-sm font-medium text-gray-300">
+          {t('issues.count', { count: issues.length })}
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export default function IssuesList({ issues }: IssuesListProps) {
           <div
             key={index}
             className={clsx(
-              'glass-card rounded-xl border p-5 transition-all duration-200 animate-slide-up cursor-pointer',
+              'rounded-xl border p-5 transition-all duration-200 animate-slide-up cursor-pointer bg-gray-900/40 backdrop-blur-sm',
               config.bg,
               config.hover
             )}
@@ -72,13 +72,13 @@ export default function IssuesList({ issues }: IssuesListProps) {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold', config.badge)}>
-                    {t(`risk.${risk}`)}
+                  <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold border', config.badge)}>
+                    {t(`issues.risk.${risk}`)}
                   </span>
                 </div>
-                <p className="font-medium text-gray-900">{issue.description}</p>
+                <p className="font-medium text-gray-200">{issue.description}</p>
               </div>
-              <button className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 transition-colors">
+              <button className="flex-shrink-0 p-1 text-gray-500 hover:text-gray-300 transition-colors">
                 {isExpanded ? (
                   <ChevronUp className="w-5 h-5" />
                 ) : (
@@ -89,28 +89,28 @@ export default function IssuesList({ issues }: IssuesListProps) {
 
             {/* Expanded details */}
             {isExpanded && (
-              <div className="mt-4 pt-4 border-t border-gray-200/60 space-y-3 animate-fade-in">
+              <div className="mt-4 pt-4 border-t border-gray-700/50 space-y-3 animate-fade-in">
                 {issue.legal_basis && (
                   <div className="flex items-start gap-3">
-                    <Scale className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <Scale className="w-4 h-4 text-gray-500 mt-0.5" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">
-                        {t('legalBasis')}
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                        {t('issues.legalBasis')}
                       </p>
-                      <p className="text-sm text-gray-700">{issue.legal_basis}</p>
+                      <p className="text-sm text-gray-300">{issue.legal_basis}</p>
                     </div>
                   </div>
                 )}
 
                 {issue.clause_snippet && (
                   <div className="flex items-start gap-3">
-                    <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <FileText className="w-4 h-4 text-gray-500 mt-0.5" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">
-                        {t('clauseSnippet')}
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                        {t('issues.clauseSnippet')}
                       </p>
-                      <div className="bg-white/60 rounded-lg p-3 border border-gray-200/60">
-                        <p className="text-sm text-gray-600 italic">
+                      <div className="bg-gray-800/60 rounded-lg p-3 border border-gray-700/50">
+                        <p className="text-sm text-gray-300 italic">
                           &ldquo;{issue.clause_snippet}&rdquo;
                         </p>
                       </div>
@@ -120,10 +120,10 @@ export default function IssuesList({ issues }: IssuesListProps) {
 
                 {issue.similarity !== undefined && (
                   <div className="flex items-start gap-3">
-                    <Percent className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <Percent className="w-4 h-4 text-gray-500 mt-0.5" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">
-                        {t('similarity', { score: Math.round(issue.similarity * 100) })}
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                        {t('issues.similarity', { score: Math.round(issue.similarity * 100) })}
                       </p>
                     </div>
                   </div>

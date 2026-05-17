@@ -18,7 +18,7 @@ export default function FileUpload({ onFileSelect, disabled, selectedFile }: Fil
 
   const validateFile = (file: File): string | null => {
     const validTypes = ['application/pdf', 'text/plain'];
-    const maxSize = 10 * 1024 * 1024; // 10 MB
+    const maxSize = 50 * 1024 * 1024; // 50 MB
 
     if (!validTypes.includes(file.type) && !file.name.endsWith('.txt') && !file.name.endsWith('.pdf')) {
       return t('error.invalidType');
@@ -86,11 +86,11 @@ export default function FileUpload({ onFileSelect, disabled, selectedFile }: Fil
           transition-all duration-300 ease-out
           ${
             isDragActive
-              ? 'border-blue-400 bg-blue-50/50 scale-[1.02] shadow-lg shadow-blue-100'
-              : 'border-gray-300 hover:border-blue-300 hover:bg-gray-50/50'
+              ? 'border-blue-500 bg-blue-900/20 scale-[1.02] shadow-lg shadow-blue-900/20'
+              : 'border-gray-700 hover:border-blue-600 hover:bg-gray-800/40'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-          ${selectedFile ? 'border-green-300 bg-green-50/30' : ''}
+          ${selectedFile ? 'border-green-600 bg-green-900/20' : ''}
         `}
       >
         <input
@@ -106,11 +106,11 @@ export default function FileUpload({ onFileSelect, disabled, selectedFile }: Fil
         <div className="flex flex-col items-center gap-4 text-center">
           {selectedFile ? (
             <>
-              <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center animate-fade-in">
-                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              <div className="w-16 h-16 rounded-2xl bg-green-900/40 flex items-center justify-center animate-fade-in">
+                <CheckCircle2 className="w-8 h-8 text-green-400" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                <p className="font-medium text-gray-200">{selectedFile.name}</p>
                 <p className="text-sm text-gray-500 mt-1">
                   {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                 </p>
@@ -118,21 +118,21 @@ export default function FileUpload({ onFileSelect, disabled, selectedFile }: Fil
             </>
           ) : isDragActive ? (
             <>
-              <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center animate-bounce">
-                <Upload className="w-8 h-8 text-blue-600" />
+              <div className="w-16 h-16 rounded-2xl bg-blue-900/40 flex items-center justify-center animate-bounce">
+                <Upload className="w-8 h-8 text-blue-400" />
               </div>
-              <p className="text-lg font-medium text-blue-600">{t('dragActive')}</p>
+              <p className="text-lg font-medium text-blue-400">{t('dragActive')}</p>
             </>
           ) : (
             <>
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-                <FileText className="w-8 h-8 text-blue-500" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-900/30 to-purple-900/30 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-blue-400" />
               </div>
               <div>
-                <p className="text-lg font-medium text-gray-700">{t('dragDrop')}</p>
+                <p className="text-lg font-medium text-gray-300">{t('dragDrop')}</p>
                 <p className="text-sm text-gray-500 mt-1">{t('fileTypes')}</p>
               </div>
-              <span className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-medium rounded-xl shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-200 hover:from-blue-600 hover:to-blue-700 transition-all duration-200">
+              <span className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium rounded-xl shadow-lg shadow-blue-900/30 hover:shadow-xl hover:shadow-blue-900/40 hover:from-blue-500 hover:to-blue-600 transition-all duration-200">
                 <Upload className="w-4 h-4" />
                 {t('browse')}
               </span>
@@ -148,14 +148,14 @@ export default function FileUpload({ onFileSelect, disabled, selectedFile }: Fil
           `}
           style={{
             background:
-              'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1))',
+              'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 51, 234, 0.08))',
           }}
         />
       </div>
 
       {/* Error message */}
       {error && (
-        <div className="mt-4 flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3 animate-fade-in">
+        <div className="mt-4 flex items-center gap-2 text-sm text-red-400 bg-red-900/30 rounded-xl px-4 py-3 animate-fade-in border border-red-800/30">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>

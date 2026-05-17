@@ -1,11 +1,10 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { X, RefreshCw, Clock, FileText, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Clock, FileText, CheckCircle2 } from 'lucide-react';
 import type { ContractAnalysisResponse } from '@/types/contract';
 import ResultsStats from './ResultsStats';
 import IssuesList from './IssuesList';
-import EntitiesTable from './EntitiesTable';
 
 interface ResultsDisplayProps {
   data: ContractAnalysisResponse;
@@ -20,18 +19,18 @@ export default function ResultsDisplay({ data, onReset }: ResultsDisplayProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">{t('title')}</h2>
+          <h2 className="text-2xl font-bold text-white">{t('title')}</h2>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-            <span className="flex items-center gap-1.5 text-sm text-gray-600">
-              <FileText className="w-4 h-4 text-gray-400" />
+            <span className="flex items-center gap-1.5 text-sm text-gray-400">
+              <FileText className="w-4 h-4 text-gray-500" />
               {t('filename', { filename: data.filename })}
             </span>
             <span className="flex items-center gap-1.5 text-sm text-gray-500">
-              <Clock className="w-4 h-4 text-gray-400" />
+              <Clock className="w-4 h-4 text-gray-500" />
               {data.processing_time_seconds}s
             </span>
             <span className="flex items-center gap-1.5 text-sm text-gray-500">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
               {t('processingInfo', {
                 method: data.processing_method,
                 ocr: data.ocr_used,
@@ -42,7 +41,7 @@ export default function ResultsDisplay({ data, onReset }: ResultsDisplayProps) {
         </div>
         <button
           onClick={onReset}
-          className="group flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-200"
+          className="group flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-xl transition-all duration-200"
         >
           <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           New Analysis
@@ -54,34 +53,9 @@ export default function ResultsDisplay({ data, onReset }: ResultsDisplayProps) {
         <ResultsStats data={data} />
       </section>
 
-      {/* Key Terms */}
-      {data.analysis.key_terms.length > 0 && (
-        <section className="animate-slide-up">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('keyTerms.title')}</h3>
-          <div className="flex flex-wrap gap-2">
-            {data.analysis.key_terms.map((term, index) => (
-              <span
-                key={index}
-                className="px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 text-sm font-medium rounded-full border border-blue-100"
-              >
-                {term}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Entities */}
-      {data.analysis.entities.length > 0 && (
-        <section className="animate-slide-up">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('entities.title')}</h3>
-          <EntitiesTable entities={data.analysis.entities} />
-        </section>
-      )}
-
       {/* Issues */}
       <section className="animate-slide-up">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('issues.title')}</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">{t('issues.title')}</h3>
         <IssuesList issues={data.analysis.issues} />
       </section>
     </div>

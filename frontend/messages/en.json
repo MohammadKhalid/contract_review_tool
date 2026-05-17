@@ -3,7 +3,21 @@
     "title": "Rental Contract Review Tool",
     "subtitle": "AI-powered analysis of German rental contracts for invalid clauses",
     "description": "Upload your German rental contract and let it be automatically analyzed for potentially invalid or problematic clauses.",
-    "legalNotice": "This tool provides legal information for educational purposes only. It is not a substitute for professional legal advice."
+    "legalNotice": "This tool provides legal information for educational purposes. It is not a substitute for professional legal advice. Always consult a qualified attorney for your specific situation.",
+    "features": {
+      "legal": {
+        "title": "Legal Analysis",
+        "desc": "Automatic detection of potentially invalid clauses based on German rental law (BGB)"
+      },
+      "risk": {
+        "title": "Risk Assessment",
+        "desc": "Each issue is categorized by risk level with legal basis and similarity scoring"
+      },
+      "ai": {
+        "title": "AI-Powered",
+        "desc": "Advanced NLP and vector search for comprehensive contract analysis"
+      }
+    }
   },
   "upload": {
     "title": "Upload Rental Contract",
@@ -13,7 +27,8 @@
     "selectedFile": "Selected file: {filename}",
     "analyze": "Analyze Contract",
     "analyzing": "Analyzing contract...",
-    "fileTypes": "PDF and TXT files only (max. 10 MB)",
+    "analyzingNote": "This may take a few minutes",
+    "fileTypes": "PDF and TXT files only (max. 50 MB)",
     "error": {
       "noFile": "Please select a file",
       "invalidType": "Only PDF and TXT files are supported",
@@ -30,26 +45,9 @@
     "stats": {
       "title": "Basic Statistics",
       "wordCount": "Words",
-      "sentences": "Sentences"
-    },
-    "keyTerms": {
-      "title": "Key Terms Found"
-    },
-    "entities": {
-      "title": "Named Entities",
-      "table": {
-        "text": "Text",
-        "label": "Type",
-        "person": "Person",
-        "org": "Organization",
-        "money": "Amount",
-        "date": "Date",
-        "location": "Location",
-        "other": "Other",
-        "law": "Law",
-        "percent": "Percent",
-        "gpe": "Location"
-      }
+      "sentences": "Sentences",
+      "keyTerms": "Key Terms",
+      "issues": "Issues"
     },
     "issues": {
       "title": "Potential Issues",
