@@ -38,15 +38,20 @@ router = APIRouter(prefix="/legal-kb", tags=["legal-knowledge-base"])
     "/seed",
     response_model=SeedResponse,
     summary="Initialize legal knowledge base",
-    description="Seed the legal knowledge base with German rental law content.",
+    description="Seed the legal knowledge base with German rental law content. "
+    "Use reset=true to clear existing data before re-seeding.",
 )
 async def seed_legal_knowledge_base(
+    reset: bool = Query(
+        False,
+        description="If true, clear all existing legal KB data before re-seeding",
+    ),
     db: Session = Depends(get_db),
     embedding_service: EmbeddingService = Depends(get_embedding_service),
 ):
     """Initialize the legal knowledge base with German rental law content."""
     try:
-        return seed_knowledge_base(db, embedding_service)
+        return seed_knowledge_base(db, embedding_service, reset=reset)
     except Exception as e:
         logger.error("Error seeding legal knowledge base: %s", str(e))
         raise HTTPException(
