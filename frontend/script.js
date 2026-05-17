@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json().catch(() => null);
+                throw new Error(
+                    errorData?.detail || `HTTP error! status: ${response.status}`
+                );
             }
 
             const data = await response.json();
@@ -90,14 +93,70 @@ document.addEventListener('DOMContentLoaded', function() {
             entitiesDiv.innerHTML = '<p>No named entities found.</p>';
         }
 
-        // Display potential issues
+        // Display potential issues with rich formatting
         const issuesDiv = document.getElementById('issues');
+        const issueCount = document.getElementById('issueCount');
+        const noIssues = document.getElementById('noIssues');
+
         if (stats.issues.length > 0) {
-            issuesDiv.innerHTML = stats.issues.map(issue =>
-                `<div class="issue-item">${issue}</div>`
-            ).join('');
+            issueCount.textContent = `Found ${stats.issues.length} potential issue(s):`;
+            issueCount.style.display = 'block';
+            noIssues.style.display = 'none';
+
+            issuesDiv.innerHTML = stats.issues.map((issue, index) => {
+                // Determine risk level badge
+                const riskLevel = (issue.risk_level || 'unknown').toLowerCase();
+                const riskLabel = riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1);
+                const riskBadge = `<span class="risk-badge risk-${riskLevel}">${riskLabel}</span>`;
+
+                // Build issue card content
+                let cardHtml = `
+                    <div class="issue-item">
+                        <div class="issue-header">
+                            ${riskBadge}
+                            <span class="issue-number">Issue #${index + 1}</span>
+                        </div>
+                        <div class="issue-description">${escapeHtml(issue.description)}</div>
+                `;
+
+                // Legal basis
+                if (issue.legal_basis) {
+                    cardHtml += `
+                        <div class="issue-detail">
+                            <span class="detail-label">Legal Basis:</span>
+                            <span class="legal-basis">${escapeHtml(issue.legal_basis)}</span>
+                        </div>
+                    `;
+                }
+
+                // Clause snippet (if available)
+                if (issue.clause_snippet) {
+                    cardHtml += `
+                        <div class="issue-detail">
+                            <span class="detail-label">Clause:</span>
+                            <span class="clause-snippet">${escapeHtml(issue.clause_snippet)}</span>
+                        </div>
+                    `;
+                }
+
+                // Similarity score (if available)
+                if (issue.similarity != null) {
+                    const simPercent = (issue.similarity * 100).toFixed(0);
+                    cardHtml += `
+                        <div class="issue-detail">
+                            <span class="detail-label">Match Confidence:</span>
+                            <span class="similarity">${simPercent}%</span>
+                        </div>
+                    `;
+                }
+
+                cardHtml += `</div>`;
+                return cardHtml;
+            }).join('');
         } else {
-            issuesDiv.innerHTML = '<p>No potential issues detected.</p>';
+            issueCount.style.display = 'none';
+            noIssues.style.display = 'block';
+            issuesDiv.innerHTML = '';
         }
 
         results.style.display = 'block';
@@ -108,5 +167,12 @@ document.addEventListener('DOMContentLoaded', function() {
         error.style.display = 'block';
         results.style.display = 'none';
         loading.style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 });

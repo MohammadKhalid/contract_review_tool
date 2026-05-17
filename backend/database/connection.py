@@ -1,12 +1,11 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
 
-# Database URL from environment variables
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://user:password@db:5432/contract_db"
-)
+from core.config import settings
+
+# Database URL from centralized configuration
+DATABASE_URL = settings.DATABASE_URL
 
 # Create engine
 engine = create_engine(DATABASE_URL, echo=False)
