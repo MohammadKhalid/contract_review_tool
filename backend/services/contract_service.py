@@ -2,9 +2,19 @@
 Contract analysis service.
 Handles PDF processing, text extraction, NLP analysis, and legal issue detection.
 This service contains the core business logic extracted from the routers.
+
+Pipeline:
+  PDF → Better OCR → Text Cleaning → Section Splitting (§1, §2...)
+    ↓
+  Rule-based checks (Kaution, Kündigungsfrist, 3-Monatsregel etc.) → fast flags
+    ↓
+  Cleaned sections → Vector search (top-3 patterns + BGB text) → LLM judge
+    ↓
+  Output with confidence score + exact quote + legal citation
 """
 
 import os
+import re
 import shutil
 import time
 import uuid
@@ -18,7 +28,13 @@ from core.exceptions import BadRequestException, FileProcessingException
 from core.logging import get_logger
 from models.contract import Contract, ContractAnalysis
 from ocr_utils import process_pdf_file
-from legal_kb.retrieval import check_clause_against_patterns
+from ocr_postprocess import extract_sections
+from legal_kb.retrieval import (
+    retrieve_top_invalid_patterns,
+    retrieve_bgb_excerpts_for_patterns,
+)
+from legal_kb.embeddings import embedding_service
+from services.llm_judge import judge_section
 from schemas.contract import (
     ContractAnalysisResponse,
     ContractAnalysisResult,
@@ -53,6 +69,90 @@ OCR_USED_MAP = {
     "ocr": "primary",
     "ocr_fallback": "fallback",
 }
+
+# ====================
+# Minimal Rule-Based Checks (fast flags)
+# ====================
+
+# Patterns for rule-based fast checks (only the most reliable)
+RULE_BASED_CHECKS = [
+    {
+        "topic": "Kaution",
+        "pattern": r"Kaution.*(?:4|vier|5|fünf|6|sechs)\s*(?:Monatsmieten|Monatsmiete|Monaten)",
+        "description": "Kaution übersteigt das gesetzliche Maximum von 3 Monatsmieten",
+        "legal_basis": "BGB § 551 Abs. 1",
+        "risk_level": "high",
+    },
+    {
+        "topic": "Kaution",
+        "pattern": r"Kaution.*(?:sofort|einmalig|in voller Höhe|auf einmal)\s*(?:fällig|zahlbar)",
+        "description": "Kaution ist nicht in drei Raten zahlbar (gesetzlich vorgeschrieben)",
+        "legal_basis": "BGB § 551 Abs. 2",
+        "risk_level": "high",
+    },
+    {
+        "topic": "Kündigung",
+        "pattern": r"(?:Kündigungsfrist|kündigen).*(?:1\s*Monat|2\s*Monate)\s*(?:zum|vor)",
+        "description": "Verkürzte Kündigungsfrist (< 3 Monate) – gesetzliche Mindestfrist beträgt 3 Monate",
+        "legal_basis": "BGB § 573c",
+        "risk_level": "high",
+    },
+    {
+        "topic": "Mietminderung",
+        "pattern": r"(?:Verzicht|Ausschluss)\s*(?:auf|der)\s*(?:Mietminderung|Mängelrechte)",
+        "description": "Verzicht auf Mietminderung ist unwirksam",
+        "legal_basis": "BGB § 536",
+        "risk_level": "high",
+    },
+    {
+        "topic": "Schönheitsreparaturen",
+        "pattern": r"(?:Endrenovierung|Schlussrenovierung|vollständig\s*renoviert)",
+        "description": "Endrenovierungsklausel unabhängig vom Zustand ist unwirksam",
+        "legal_basis": "BGH VIII ZR 316/09",
+        "risk_level": "high",
+    },
+    {
+        "topic": "Kaution",
+        "pattern": r"Kaution.*(?:unverzinslich|ohne.*Verzinsung|nicht.*verzinst)",
+        "description": "Kaution muss verzinslich und getrennt angelegt werden",
+        "legal_basis": "BGB § 551 Abs. 3",
+        "risk_level": "medium",
+    },
+]
+
+
+def _run_rule_based_checks(section_text: str) -> List[ContractIssue]:
+    """
+    Run minimal, highly reliable rule-based checks on a section.
+    These are fast regex-based flags for the most common illegal patterns.
+
+    Args:
+        section_text: The contract section text to check.
+
+    Returns:
+        List of ContractIssue objects for matched rules.
+    """
+    issues = []
+    for check in RULE_BASED_CHECKS:
+        if re.search(check["pattern"], section_text, re.IGNORECASE):
+            issues.append(
+                ContractIssue(
+                    description=check["description"],
+                    risk_level=check["risk_level"],
+                    legal_basis=check["legal_basis"],
+                    clause_snippet=section_text[:200],
+                    confidence=0.95,  # Rule-based checks are high confidence
+                    exact_quote=section_text[:200],
+                    legal_citation=check["legal_basis"],
+                    detection_method="rule_based",
+                )
+            )
+    return issues
+
+
+# ====================
+# Core Service Functions
+# ====================
 
 
 def save_upload_file(file_obj, filename: str) -> Tuple[str, int]:
@@ -154,6 +254,11 @@ def split_into_clauses(text: str, doc: spacy.tokens.Doc) -> List[str]:
     """
     Split contract text into individual clauses for analysis.
 
+    Three strategies, tried in order:
+      1. Regex-based section extraction (§ 1, 1., etc.) — best for German legal docs
+      2. Double newline (paragraph) splitting
+      3. spaCy sentence splitting (fallback)
+
     Args:
         text: The full extracted text
         doc: A spaCy Doc object (for sentence fallback)
@@ -161,10 +266,15 @@ def split_into_clauses(text: str, doc: spacy.tokens.Doc) -> List[str]:
     Returns:
         List of clause text strings
     """
-    # Try splitting by double newlines first (paragraphs)
+    # Strategy 1: Regex section extraction for German legal documents
+    sections = extract_sections(text)
+    if len(sections) > 1:
+        return sections
+
+    # Strategy 2: Try splitting by double newlines first (paragraphs)
     clauses = [clause.strip() for clause in text.split("\n\n") if clause.strip()]
 
-    # Fall back to sentences if no paragraph splits found
+    # Strategy 3: Fall back to sentences if no paragraph splits found
     if not clauses:
         clauses = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
 
@@ -172,10 +282,15 @@ def split_into_clauses(text: str, doc: spacy.tokens.Doc) -> List[str]:
 
 
 def detect_legal_issues(
-    db: Session, clauses: List[str], min_length: int = 20, max_issues: int = 10
+    db: Session,
+    clauses: List[str],
+    min_length: int = 20,
+    max_issues: int = 10,
 ) -> List[ContractIssue]:
     """
-    Check each clause against known invalid clause patterns.
+    Enhanced legal issue detection with new pipeline:
+    1. Rule-based fast checks → fast flags
+    2. Vector search (top-3 patterns + BGB text) → LLM judge
 
     Args:
         db: Database session
@@ -193,29 +308,124 @@ def detect_legal_issues(
         if len(clause) < min_length:
             continue
 
-        matches = check_clause_against_patterns(db, clause)
-        for match in matches:
-            description = (
-                f"Potential invalid clause: '{clause[:100]}...' "
-                f"- {match['why_invalid']} "
-                f"(Risk: {match['risk_level']})"
-            )
-            if match.get("legal_basis"):
-                description += f" - Legal basis: {match['legal_basis']}"
+        # --- Step 1: Minimal Rule-Based Checks (fast flags) ---
+        rule_issues = _run_rule_based_checks(clause)
+        for issue in rule_issues:
+            desc_sig = issue.description[:80]
+            if desc_sig not in seen_descriptions:
+                seen_descriptions.add(desc_sig)
+                issues.append(issue)
 
-            # Deduplicate
-            if description not in seen_descriptions:
-                seen_descriptions.add(description)
+        # --- Step 2: Vector search → LLM judge ---
+        # Generate embedding for this section
+        section_embedding = embedding_service.encode_single(clause)
+
+        # Retrieve top-3 most relevant invalid patterns
+        top_patterns = retrieve_top_invalid_patterns(
+            db,
+            section_embedding,
+            limit=settings.LLM_SEARCH_LIMIT,
+            similarity_threshold=0.6,
+        )
+
+        if not top_patterns:
+            # No relevant patterns found for this section, skip LLM
+            continue
+
+        # Retrieve exact BGB text excerpts for the matched patterns
+        bgb_excerpts = retrieve_bgb_excerpts_for_patterns(db, top_patterns, limit=3)
+
+        # --- Step 3: Call LLM judge ---
+        llm_result = judge_section(
+            section_text=clause,
+            top_patterns=top_patterns,
+            bgb_excerpts=bgb_excerpts,
+        )
+
+        if llm_result.get("ocr_error"):
+            # OCR quality issue flagged
+            desc = "OCR error – manual review needed"
+            if desc not in seen_descriptions:
+                seen_descriptions.add(desc)
                 issues.append(
                     ContractIssue(
-                        description=description,
-                        risk_level=match.get("risk_level"),
-                        legal_basis=match.get("legal_basis"),
+                        description=desc,
+                        risk_level="medium",
+                        legal_basis=None,
                         clause_snippet=clause[:200],
-                        similarity=match.get("similarity"),
+                        confidence=0.0,
+                        exact_quote=clause[:200],
+                        legal_citation=None,
+                        detection_method="ocr_error",
+                    )
+                )
+            continue
+
+        if (
+            llm_result.get("flag")
+            and llm_result.get("confidence", 0) >= settings.LLM_CONFIDENCE_THRESHOLD
+        ):
+            # Flagged by LLM with sufficient confidence
+            # Use the matched pattern info for legal basis / topic
+            matched_topic = llm_result.get("matched_pattern")
+            matched_pattern_info = None
+            for p in top_patterns:
+                if (
+                    p.get("topic") == matched_topic
+                    or p.get("clause_pattern") == matched_topic
+                ):
+                    matched_pattern_info = p
+                    break
+            if not matched_pattern_info:
+                matched_pattern_info = top_patterns[0] if top_patterns else None
+
+            desc = (
+                f"LLM-flagged: {llm_result.get('reason', 'Potential invalid clause')[:150]}. "
+                f"Pattern: {matched_pattern_info.get('topic', 'unknown') if matched_pattern_info else 'unknown'}"
+            )
+
+            if desc not in seen_descriptions:
+                seen_descriptions.add(desc)
+                issues.append(
+                    ContractIssue(
+                        description=desc,
+                        risk_level=(
+                            matched_pattern_info.get("risk_level", "medium")
+                            if matched_pattern_info
+                            else "medium"
+                        ),
+                        legal_basis=(
+                            matched_pattern_info.get("legal_basis", None)
+                            if matched_pattern_info
+                            else None
+                        ),
+                        clause_snippet=clause[:200],
+                        similarity=(
+                            matched_pattern_info.get("similarity", None)
+                            if matched_pattern_info
+                            else None
+                        ),
+                        confidence=llm_result.get("confidence", 0.0),
+                        exact_quote=llm_result.get("exact_quote"),
+                        legal_citation=(
+                            llm_result.get("legal_citation")
+                            or (
+                                matched_pattern_info.get("bgb_citation")
+                                if matched_pattern_info
+                                else None
+                            )
+                        ),
+                        detection_method="llm",
                     )
                 )
 
+    # Limit to max_issues, prioritizing high-risk ones
+    issues.sort(
+        key=lambda x: (
+            0 if x.risk_level == "high" else 1 if x.risk_level == "medium" else 2,
+            -(x.confidence or 0),
+        )
+    )
     return issues[:max_issues]
 
 
@@ -278,6 +488,9 @@ def analyze_contract(
 ) -> Tuple[ContractAnalysisResponse, float]:
     """
     Full contract analysis pipeline: validate, extract, analyze, detect issues.
+
+    Pipeline:
+      PDF → OCR → Section Splitting → Rule-based checks → Vector search → LLM judge
 
     Args:
         db: Database session

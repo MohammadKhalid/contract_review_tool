@@ -191,7 +191,8 @@ def ingest_seed_documents(db: Session, source_ids: Dict[str, int]) -> List[int]:
 
 def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List[int]:
     """
-    Ingest seed invalid clause patterns.
+    Ingest seed invalid clause patterns and generate structured embeddings for them.
+    Each pattern gets an embedding from a combined description string for vector search.
 
     Returns:
         List of created invalid clause IDs
@@ -234,7 +235,21 @@ def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List
             "recommended_response"
         ) or clause_data.get("recommended_alternative")
 
-        # Create new invalid clause pattern
+        # Build a rich text representation for embedding
+        embedding_text = (
+            f"Topic: {clause_data['topic']}. "
+            f"Pattern: {clause_data['clause_pattern']}. "
+            f"Why invalid: {clause_data['why_invalid']}. "
+            f"Legal basis: {clause_data.get('legal_basis', '')}. "
+            f"Example: {clause_data.get('example_text', '')}. "
+            f"BGB citation: {clause_data.get('bgb_citation', '')}. "
+            f"BGB text: {clause_data.get('bgb_text_excerpt', '')}."
+        )
+
+        # Generate embedding from the rich text
+        embedding = embedding_service.encode_single(embedding_text)
+
+        # Create new invalid clause pattern with pre-computed embedding
         clause = InvalidClausePattern(
             topic=clause_data["topic"],
             clause_pattern=clause_data["clause_pattern"],
@@ -244,13 +259,16 @@ def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List
             example_text=clause_data.get("example_text"),
             recommended_response=recommended_response,
             source_document_id=None,  # Could link to specific documents later
+            embedding=embedding,  # Store pre-computed embedding for vector search
+            bgb_citation=clause_data.get("bgb_citation"),
+            bgb_text_excerpt=clause_data.get("bgb_text_excerpt"),
         )
 
         db.add(clause)
         db.flush()
         clause_ids.append(clause.id)
         logger.info(
-            f"Created invalid clause pattern: {clause.topic} - {clause.clause_pattern[:50]}..."
+            f"Created invalid clause pattern with embedding: {clause.topic} - {clause.clause_pattern[:50]}..."
         )
 
     db.commit()
@@ -400,5 +418,5 @@ def get_kb_stats(db: Session) -> Dict[str, Any]:
         "documents": documents_count,
         "chunks": chunks_count,
         "invalid_clauses": clauses_count,
-        "total_embeddings": chunks_count,
+        "total_embeddings": chunks_count + clauses_count,
     }

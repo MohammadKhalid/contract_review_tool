@@ -153,6 +153,152 @@ def search_legal_knowledge(
     }
 
 
+def retrieve_top_invalid_patterns(
+    db: Session,
+    section_embedding: np.ndarray,
+    limit: int = 3,
+    similarity_threshold: float = 0.6,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve top-N most relevant invalid clause patterns for a section using vector search.
+
+    Uses the pre-computed embeddings on invalid_clause_patterns table.
+    This replaces the old in-memory brute-force check in check_clause_against_patterns.
+
+    Args:
+        db: Database session
+        section_embedding: Embedding vector of the contract section.
+        limit: Maximum number of patterns to return (default 3).
+        similarity_threshold: Minimum similarity (0-1) for a pattern to be considered.
+
+    Returns:
+        List of top matching invalid clause patterns with similarity and metadata.
+    """
+    embedding_list = section_embedding.tolist()
+
+    sql = text("""
+        SELECT
+            id,
+            topic,
+            clause_pattern,
+            why_invalid,
+            legal_basis,
+            risk_level,
+            example_text,
+            recommended_response,
+            bgb_citation,
+            bgb_text_excerpt,
+            embedding <=> :query_embedding as distance
+        FROM invalid_clause_patterns
+        WHERE embedding IS NOT NULL
+          AND embedding <=> :query_embedding < :threshold
+        ORDER BY embedding <=> :query_embedding
+        LIMIT :limit
+    """)
+
+    result = db.execute(
+        sql,
+        {
+            "query_embedding": embedding_list,
+            "threshold": 1.0 - similarity_threshold,
+            "limit": limit,
+        },
+    )
+
+    patterns = []
+    for row in result:
+        patterns.append(
+            {
+                "id": row.id,
+                "topic": row.topic,
+                "clause_pattern": row.clause_pattern,
+                "why_invalid": row.why_invalid,
+                "legal_basis": row.legal_basis,
+                "risk_level": row.risk_level,
+                "example_text": row.example_text,
+                "recommended_response": row.recommended_response,
+                "bgb_citation": row.bgb_citation,
+                "bgb_text_excerpt": row.bgb_text_excerpt,
+                "similarity": 1.0 - row.distance,
+            }
+        )
+
+    logger.info("Retrieved %d relevant invalid patterns for section", len(patterns))
+    return patterns
+
+
+def retrieve_bgb_excerpts_for_patterns(
+    db: Session,
+    patterns: List[Dict[str, Any]],
+    limit: int = 3,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve exact BGB text excerpts relevant to the matched patterns.
+    Searches legal_documents / legal_chunks for citations matching the pattern's legal_basis.
+
+    Args:
+        db: Database session
+        patterns: List of matched invalid clause patterns (from retrieve_top_invalid_patterns).
+        limit: Maximum number of BGB excerpts to return.
+
+    Returns:
+        List of BGB legal text excerpts with citations.
+    """
+    citations = set()
+    for p in patterns:
+        legal_basis = p.get("legal_basis") or p.get("bgb_citation") or ""
+        # Extract BGB § references like "BGB § 551" or "BGB § 551 Abs. 3"
+        import re
+
+        matches = re.findall(r"BGB § \d+[a-z]?(?: Abs\. \d+)?", legal_basis)
+        for m in matches:
+            citations.add(m)
+        if p.get("bgb_citation"):
+            citations.add(p["bgb_citation"])
+
+    if not citations:
+        return []
+
+    excerpts = []
+    for citation in citations:
+        # Try to find by citation in legal_documents
+        doc = db.query(LegalDocument).filter(LegalDocument.citation == citation).first()
+        if doc:
+            excerpts.append(
+                {
+                    "citation": doc.citation,
+                    "title": doc.title,
+                    "text": doc.text[:1000],
+                    "summary": doc.summary,
+                }
+            )
+            if len(excerpts) >= limit:
+                break
+
+        # Fallback: search by keyword in citation
+        if not doc:
+            like_pattern = f"%{citation.replace('BGB § ', '')}%"
+            docs = (
+                db.query(LegalDocument)
+                .filter(LegalDocument.citation.ilike(like_pattern))
+                .limit(limit - len(excerpts))
+                .all()
+            )
+            for d in docs:
+                excerpts.append(
+                    {
+                        "citation": d.citation,
+                        "title": d.title,
+                        "text": d.text[:1000],
+                        "summary": d.summary,
+                    }
+                )
+                if len(excerpts) >= limit:
+                    break
+
+    return excerpts[:limit]
+
+
 def get_invalid_clause_patterns(
     db: Session,
     topic: Optional[str] = None,

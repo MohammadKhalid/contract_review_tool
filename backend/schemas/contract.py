@@ -28,6 +28,19 @@ class ContractIssue(BaseModel):
     similarity: Optional[float] = Field(
         None, ge=0.0, le=1.0, description="Similarity score to known pattern"
     )
+    # New fields for LLM judge
+    confidence: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="LLM self-reported confidence"
+    )
+    exact_quote: Optional[str] = Field(
+        None, description="Exact original text quote flagged as problematic"
+    )
+    legal_citation: Optional[str] = Field(
+        None, description="Exact BGB paragraph citation"
+    )
+    detection_method: Optional[str] = Field(
+        None, description="How issue was detected: rule_based, llm, ocr_error"
+    )
 
 
 class ContractAnalysisResult(BaseModel):
