@@ -5,8 +5,10 @@ Handles text embeddings using sentence-transformers for vector search.
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from typing import List, Union
+from typing import List, Union, Dict, Tuple
 import logging
+from functools import lru_cache
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ class EmbeddingService:
         try:
             self.model = SentenceTransformer(model_name)
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
+            self._embedding_cache: Dict[str, np.ndarray] = {}
             logger.info(
                 f"Loaded embedding model: {model_name} (dimension: {self.embedding_dim})"
             )
@@ -36,22 +39,28 @@ class EmbeddingService:
 
     def encode_single(self, text: str) -> np.ndarray:
         """
-        Generate embedding for a single text.
-
-        Args:
-            text: Input text to embed
-
-        Returns:
-            Numpy array of embedding vector
+        Generate embedding for a single text (with simple LRU cache).
         """
         if not text or not text.strip():
             return np.zeros(self.embedding_dim, dtype=np.float32)
 
+        # Simple cache key
+        key = hashlib.md5(text.encode("utf-8")).hexdigest()
+
+        if key in self._embedding_cache:
+            return self._embedding_cache[key]
+
         try:
             embedding = self.model.encode(
                 text, convert_to_numpy=True, normalize_embeddings=True
-            )
-            return embedding.astype(np.float32)
+            ).astype(np.float32)
+
+            # Very small bounded cache (last 512 unique clauses)
+            if len(self._embedding_cache) > 512:
+                self._embedding_cache.pop(next(iter(self._embedding_cache)))
+
+            self._embedding_cache[key] = embedding
+            return embedding
         except Exception as e:
             logger.error(f"Error encoding text: {e}")
             return np.zeros(self.embedding_dim, dtype=np.float32)

@@ -13,6 +13,8 @@ from legal_kb.ingestion import (
     ingest_seed_sources,
     ingest_seed_documents,
     ingest_seed_invalid_clauses,
+    ingest_seed_bgh_rulings,
+    clear_legal_knowledge_base,
     get_kb_stats,
 )
 from legal_kb.retrieval import (
@@ -35,7 +37,9 @@ logger = get_logger(__name__)
 
 
 def seed_knowledge_base(
-    db: Session, embedding_service: EmbeddingService
+    db: Session,
+    embedding_service: EmbeddingService,
+    reset: bool = False,
 ) -> SeedResponse:
     """
     Seed the legal knowledge base with initial data.
@@ -43,11 +47,20 @@ def seed_knowledge_base(
     Args:
         db: Database session
         embedding_service: Embedding service for generating vector embeddings
+        reset: If True, clear existing data before seeding
 
     Returns:
         SeedResponse with counts of created items
     """
-    logger.info("Starting legal knowledge base seeding...")
+    logger.info(
+        "Starting legal knowledge base seeding%s...", " with reset" if reset else ""
+    )
+
+    records_deleted = None
+    if reset:
+        logger.warning("Reset requested: clearing all existing legal KB data...")
+        records_deleted = clear_legal_knowledge_base(db)
+        logger.info("Clear completed")
 
     source_ids = ingest_seed_sources(db)
     sources_created = len(source_ids)
@@ -56,6 +69,10 @@ def seed_knowledge_base(
     document_ids = ingest_seed_documents(db, source_ids)
     documents_created = len(document_ids)
     logger.info("Seeded %d legal documents", documents_created)
+
+    bgh_ids = ingest_seed_bgh_rulings(db, source_ids)
+    bgh_rulings_created = len(bgh_ids)
+    logger.info("Seeded %d BGH rulings", bgh_rulings_created)
 
     invalid_clause_ids = ingest_seed_invalid_clauses(db, source_ids)
     invalid_clauses_created = len(invalid_clause_ids)
@@ -67,11 +84,18 @@ def seed_knowledge_base(
     logger.info("Generated embeddings for %d document chunks", embeddings_created)
 
     return SeedResponse(
-        message="Legal knowledge base seeded successfully",
+        message=(
+            "Legal knowledge base seeded successfully"
+            if not reset
+            else "Legal knowledge base reset and re-seeded successfully"
+        ),
         sources_created=sources_created,
         documents_created=documents_created,
+        bgh_rulings_created=bgh_rulings_created,
         invalid_clauses_created=invalid_clauses_created,
         embeddings_created=embeddings_created,
+        reset_performed=reset,
+        records_deleted=records_deleted,
     )
 
 

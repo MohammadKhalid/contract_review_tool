@@ -1,73 +1,66 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, ForeignKey, Index
+"""
+Models for legal knowledge base.
+Defines database models for storing legal sources, documents, and clause patterns.
+"""
+
+from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, Index
+from sqlalchemy.dialects.postgresql import JSON as PG_JSON
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from database.connection import Base
 from pgvector.sqlalchemy import Vector
+
+from database.connection import Base
 
 
 class LegalSource(Base):
-    """Stores metadata about legal sources (laws, regulations, case law, checklists)"""
+    """Represents a legal source (e.g., BGB, BGH rulings, regulations)."""
 
     __tablename__ = "legal_sources"
 
     id = Column(Integer, primary_key=True, index=True)
     source_type = Column(
         String, nullable=False
-    )  # 'law', 'regulation', 'case_law', 'checklist', 'invalid_clause'
+    )  # 'law', 'case_law', 'regulation', etc.
     title = Column(String, nullable=False)
-    jurisdiction = Column(String, default="DE")  # Usually 'DE' for Germany
-    publisher = Column(
-        String, nullable=True
-    )  # e.g. 'gesetze-im-internet', 'BGH', 'Mieterbund'
+    jurisdiction = Column(String, nullable=True)  # e.g., 'DE'
+    publisher = Column(String, nullable=True)
     source_url = Column(String, nullable=True)
-    retrieved_at = Column(DateTime, default=datetime.utcnow)
-    effective_date = Column(DateTime, nullable=True)
-    last_checked_at = Column(DateTime, default=datetime.utcnow)
-    license_note = Column(Text, nullable=True)
-    content_hash = Column(String, nullable=True)  # For detecting changes
+    retrieved_at = Column(String, nullable=True)
+    license_note = Column(String, nullable=True)
 
     # Relationships
-    documents = relationship(
-        "LegalDocument", back_populates="source", cascade="all, delete-orphan"
-    )
+    documents = relationship("LegalDocument", back_populates="source")
 
 
 class LegalDocument(Base):
-    """Stores structured legal documents/sections"""
+    """Represents a specific legal document (e.g., BGB § 535)."""
 
     __tablename__ = "legal_documents"
 
     id = Column(Integer, primary_key=True, index=True)
     source_id = Column(Integer, ForeignKey("legal_sources.id"), nullable=False)
-    citation = Column(
-        String, nullable=True
-    )  # e.g. 'BGB § 551', 'BetrKV § 2', 'BGH VIII ZR ...'
-    title = Column(String, nullable=False)
-    category = Column(
-        String, nullable=True
-    )  # 'deposit', 'termination', 'operating_costs', 'agb', etc.
-    text = Column(Text, nullable=False)
-    summary = Column(Text, nullable=True)
-    metadata_json = Column(JSON, nullable=True)  # Additional structured metadata
+    citation = Column(String, nullable=False)  # e.g., 'BGB § 535'
+    title = Column(String, nullable=True)  # Short title/description
+    category = Column(String, nullable=True)  # e.g., 'deposit', 'termination'
+    summary = Column(String, nullable=True)
+    text = Column(Text, nullable=False)  # Full legal text
+    keywords = Column(PG_JSON, nullable=True)  # List of keywords
 
     # Relationships
     source = relationship("LegalSource", back_populates="documents")
-    chunks = relationship(
-        "LegalChunk", back_populates="document", cascade="all, delete-orphan"
-    )
+    chunks = relationship("LegalChunk", back_populates="document")
 
 
 class LegalChunk(Base):
-    """Stores chunked text and embeddings for vector search"""
+    """Represents a chunk of a legal document with its embedding."""
 
     __tablename__ = "legal_chunks"
 
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("legal_documents.id"), nullable=False)
-    chunk_index = Column(Integer, nullable=False)  # Position within document
-    text = Column(Text, nullable=False)
+    chunk_index = Column(Integer, nullable=False)  # Order within document
+    text = Column(Text, nullable=False)  # Chunk text
     embedding = Column(
-        Vector(384)
+        Vector(384), nullable=False
     )  # 384 dimensions for paraphrase-multilingual-MiniLM-L12-v2
     token_count = Column(Integer, nullable=True)
     metadata_json = Column(JSON, nullable=True)  # Additional chunk metadata
@@ -99,6 +92,20 @@ class InvalidClausePattern(Base):
     source_document_id = Column(
         Integer, ForeignKey("legal_documents.id"), nullable=True
     )
+    embedding = Column(
+        Vector(384), nullable=True
+    )  # Pre-computed embedding for vector search
+    bgb_citation = Column(String, nullable=True)  # Exact BGB paragraph citation
+    bgb_text_excerpt = Column(Text, nullable=True)  # Exact BGB text excerpt
 
     # Relationships
     source_document = relationship("LegalDocument")
+
+    # Index for vector similarity search on invalid clause patterns
+    __table_args__ = (
+        Index(
+            "invalid_clause_embedding_idx",
+            embedding,
+            postgresql_using="ivfflat",
+        ),
+    )

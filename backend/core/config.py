@@ -56,10 +56,21 @@ class Settings(BaseSettings):
     VECTOR_SIMILARITY_THRESHOLD: float = 0.7
     VECTOR_SEARCH_LIMIT: int = 5
 
-    # Pattern matching
+    # Pattern matching (rule-based minimal checks)
     CLAUSE_MIN_LENGTH: int = 20
     PATTERN_SIMILARITY_THRESHOLD: float = 0.8
     MAX_ISSUES: int = 10
+
+    # xAI / LLM Judge
+    XAI_API_KEY: str = Field(default="", alias="XAI_API_KEY")
+    XAI_MODEL: str = Field(default="grok-4.3", alias="XAI_MODEL")
+    LLM_SEARCH_LIMIT: int = 3
+    LLM_CONFIDENCE_THRESHOLD: float = 0.6
+
+    # LLM / Parallelism tuning (new for performance)
+    LLM_CONCURRENCY: int = 6          # Max concurrent LLM calls
+    LLM_JUDGE_THRESHOLD: float = 0.75 # Higher threshold to decide whether to call the expensive LLM judge
+    LLM_BATCH_SIZE: int = 3           # Number of clauses to judge in one LLM call (reduces round-trips)
 
     # Logging
     LOG_LEVEL: str = "INFO"

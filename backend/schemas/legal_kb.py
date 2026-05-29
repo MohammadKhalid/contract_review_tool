@@ -81,7 +81,17 @@ class SeedResponse(BaseModel):
     invalid_clauses_created: int = Field(
         ..., description="Number of invalid clauses created"
     )
+    bgh_rulings_created: int = Field(
+        default=0, description="Number of BGH rulings created"
+    )
     embeddings_created: int = Field(..., description="Number of embeddings generated")
+    reset_performed: bool = Field(
+        default=False, description="Whether existing data was cleared before seeding"
+    )
+    records_deleted: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Counts of records deleted if reset was performed",
+    )
 
 
 class KBStatsResponse(BaseModel):

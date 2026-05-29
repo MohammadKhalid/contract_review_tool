@@ -3,9 +3,10 @@ Contract upload and analysis API endpoints.
 Thin router that delegates business logic to the contract service.
 """
 
+import asyncio
 import logging
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import spacy
 
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/contracts")
 )
 async def analyze_contract_endpoint(
     file: UploadFile = File(...),
+    lang: str = Query("de", description="Language for issue descriptions ('en' or 'de')"),
     db: Session = Depends(get_db),
     nlp: spacy.Language = Depends(get_nlp_model),
 ):
@@ -38,11 +40,18 @@ async def analyze_contract_endpoint(
     Extracts text, performs legal analysis using knowledge base, and returns results.
     """
     try:
-        response, _ = analyze_contract(
+        # Normalize language early
+        lang = (lang or "de").lower()[:2]
+        if lang not in ("en", "de"):
+            lang = "de"
+
+        # Call the async analysis pipeline directly
+        response, _ = await analyze_contract(
             db=db,
             file_obj=file.file,
             filename=file.filename or "unknown.pdf",
             nlp=nlp,
+            lang=lang,
         )
         return response
 

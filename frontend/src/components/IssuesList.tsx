@@ -2,7 +2,18 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, ChevronDown, ChevronUp, Scale, FileText, Percent } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Scale,
+  FileText,
+  Percent,
+  Bot,
+  Shield,
+  AlertOctagon,
+} from 'lucide-react';
+
 import type { ContractIssue } from '@/types/contract';
 import clsx from 'clsx';
 
@@ -29,6 +40,12 @@ const riskConfig = {
     icon: 'text-green-400',
     hover: 'hover:border-green-700/50',
   },
+};
+
+const methodIcons: Record<string, typeof Bot> = {
+  rule_based: Shield,
+  llm: Bot,
+  ocr_error: AlertOctagon,
 };
 
 export default function IssuesList({ issues }: IssuesListProps) {
@@ -75,8 +92,31 @@ export default function IssuesList({ issues }: IssuesListProps) {
                   <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold border', config.badge)}>
                     {t(`issues.risk.${risk}`)}
                   </span>
+                  {issue.detection_method && methodIcons[issue.detection_method] && (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium border border-gray-600/30 bg-gray-800/40 text-gray-400 flex items-center gap-1">
+                      {(() => {
+                        const Icon = methodIcons[issue.detection_method];
+                        return <Icon className="w-3 h-3" />;
+                      })()}
+                      {t(`issues.detectionMethod.${issue.detection_method}`)}
+                    </span>
+                  )}
                 </div>
                 <p className="font-medium text-gray-200">{issue.description}</p>
+                {(issue.confidence !== undefined || issue.exact_quote) && (
+                  <div className="flex items-center gap-3 mt-1.5">
+                    {issue.confidence !== undefined && (
+                      <span className="text-xs text-gray-500">
+                        Confidence: {(issue.confidence * 100).toFixed(0)}%
+                      </span>
+                    )}
+                    {issue.exact_quote && (
+                      <span className="text-xs text-gray-500 truncate max-w-[300px]">
+                        &ldquo;{issue.exact_quote.slice(0, 80)}&rdquo;
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <button className="flex-shrink-0 p-1 text-gray-500 hover:text-gray-300 transition-colors">
                 {isExpanded ? (
@@ -102,7 +142,35 @@ export default function IssuesList({ issues }: IssuesListProps) {
                   </div>
                 )}
 
-                {issue.clause_snippet && (
+                {issue.legal_citation && (
+                  <div className="flex items-start gap-3">
+                    <Scale className="w-4 h-4 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                        {t('issues.legalCitation')}
+                      </p>
+                      <p className="text-sm text-blue-300 font-mono">{issue.legal_citation}</p>
+                    </div>
+                  </div>
+                )}
+
+                {issue.exact_quote && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-4 h-4 text-amber-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                        {t('issues.exactQuote')}
+                      </p>
+                      <div className="bg-gray-800/60 rounded-lg p-3 border border-amber-800/30">
+                        <p className="text-sm text-amber-200 italic">
+                          &ldquo;{issue.exact_quote}&rdquo;
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {issue.clause_snippet && !issue.exact_quote && (
                   <div className="flex items-start gap-3">
                     <FileText className="w-4 h-4 text-gray-500 mt-0.5" />
                     <div>
@@ -118,12 +186,28 @@ export default function IssuesList({ issues }: IssuesListProps) {
                   </div>
                 )}
 
-                {issue.similarity !== undefined && (
+                {(issue.similarity !== undefined || issue.confidence !== undefined) && (
                   <div className="flex items-start gap-3">
                     <Percent className="w-4 h-4 text-gray-500 mt-0.5" />
                     <div>
                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
-                        {t('issues.similarity', { score: Math.round(issue.similarity * 100) })}
+                        {issue.confidence !== undefined
+                          ? t('issues.llmConfidence', { score: (issue.confidence * 100).toFixed(1) })
+                          : t('issues.similarity', { score: Math.round(issue.similarity! * 100) })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {issue.detection_method === 'ocr_error' && (
+                  <div className="flex items-start gap-3">
+                    <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-red-400 uppercase tracking-wider mb-1">
+                        {t('issues.actionRequired')}
+                      </p>
+                      <p className="text-sm text-gray-300">
+                        {t('issues.ocrErrorMessage')}
                       </p>
                     </div>
                   </div>

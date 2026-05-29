@@ -3,10 +3,8 @@ Ingestion module for legal knowledge base.
 Handles loading seed data and generating embeddings.
 """
 
-import hashlib
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from datetime import datetime
 import logging
 
 from models.legal_kb import LegalSource, LegalDocument, LegalChunk, InvalidClausePattern
@@ -15,14 +13,10 @@ from legal_kb.seed_data import (
     get_seed_sources,
     get_seed_documents,
     get_seed_invalid_clauses,
+    get_seed_bgh_rulings,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def calculate_content_hash(text: str) -> str:
-    """Calculate SHA256 hash of text content for change detection."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
@@ -97,7 +91,10 @@ def ingest_seed_sources(db: Session) -> Dict[str, int]:
             source_ids[source_data["title"]] = existing.id
             continue
 
-        # Create new source
+        # Create new source.
+        # Note: A 'content_hash' field was previously referenced in this code
+        # for change detection, but the column was never added to the model.
+        # The feature is currently unused, so we omit it.
         source = LegalSource(
             source_type=source_data["source_type"],
             title=source_data["title"],
@@ -105,7 +102,6 @@ def ingest_seed_sources(db: Session) -> Dict[str, int]:
             publisher=source_data.get("publisher"),
             source_url=source_data.get("source_url"),
             license_note=source_data.get("license_note"),
-            content_hash=calculate_content_hash(source_data["title"]),
         )
 
         db.add(source)
@@ -157,7 +153,7 @@ def ingest_seed_documents(db: Session, source_ids: Dict[str, int]) -> List[int]:
             category=doc_data.get("category"),
             text=doc_data["text"],
             summary=doc_data.get("summary"),
-            metadata_json=doc_data.get("metadata_json", {}),
+            keywords=doc_data.get("keywords"),
         )
 
         db.add(document)
@@ -190,7 +186,8 @@ def ingest_seed_documents(db: Session, source_ids: Dict[str, int]) -> List[int]:
 
 def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List[int]:
     """
-    Ingest seed invalid clause patterns.
+    Ingest seed invalid clause patterns and generate structured embeddings for them.
+    Each pattern gets an embedding from a combined description string for vector search.
 
     Returns:
         List of created invalid clause IDs
@@ -198,12 +195,19 @@ def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List
     clauses_data = get_seed_invalid_clauses()
     clause_ids = []
 
-    # Get the invalid clause source
-    invalid_clause_source_title = "Häufig unwirksame Klauseln in Mietverträgen"
-    source_id = source_ids.get(invalid_clause_source_title)
+    # Look up the invalid clause source dynamically from seed data
+    invalid_clause_source_title = _lookup_source_title_by_type("invalid_clause")
+    if not invalid_clause_source_title:
+        logger.warning(
+            "No invalid_clause source found in seed data, skipping invalid clauses"
+        )
+        return clause_ids
 
+    source_id = source_ids.get(invalid_clause_source_title)
     if not source_id:
-        logger.warning("Invalid clause source not found, skipping invalid clauses")
+        logger.warning(
+            f"Invalid clause source '{invalid_clause_source_title}' not found in DB, skipping invalid clauses"
+        )
         return clause_ids
 
     for clause_data in clauses_data:
@@ -221,7 +225,26 @@ def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List
             clause_ids.append(existing.id)
             continue
 
-        # Create new invalid clause pattern
+        # Map recommended_alternative to recommended_response if present
+        recommended_response = clause_data.get(
+            "recommended_response"
+        ) or clause_data.get("recommended_alternative")
+
+        # Build a rich text representation for embedding
+        embedding_text = (
+            f"Topic: {clause_data['topic']}. "
+            f"Pattern: {clause_data['clause_pattern']}. "
+            f"Why invalid: {clause_data['why_invalid']}. "
+            f"Legal basis: {clause_data.get('legal_basis', '')}. "
+            f"Example: {clause_data.get('example_text', '')}. "
+            f"BGB citation: {clause_data.get('bgb_citation', '')}. "
+            f"BGB text: {clause_data.get('bgb_text_excerpt', '')}."
+        )
+
+        # Generate embedding from the rich text
+        embedding = embedding_service.encode_single(embedding_text)
+
+        # Create new invalid clause pattern with pre-computed embedding
         clause = InvalidClausePattern(
             topic=clause_data["topic"],
             clause_pattern=clause_data["clause_pattern"],
@@ -229,51 +252,153 @@ def ingest_seed_invalid_clauses(db: Session, source_ids: Dict[str, int]) -> List
             legal_basis=clause_data.get("legal_basis"),
             risk_level=clause_data["risk_level"],
             example_text=clause_data.get("example_text"),
-            recommended_response=clause_data.get("recommended_response"),
+            recommended_response=recommended_response,
             source_document_id=None,  # Could link to specific documents later
+            embedding=embedding,  # Store pre-computed embedding for vector search
+            bgb_citation=clause_data.get("bgb_citation"),
+            bgb_text_excerpt=clause_data.get("bgb_text_excerpt"),
         )
 
         db.add(clause)
         db.flush()
         clause_ids.append(clause.id)
         logger.info(
-            f"Created invalid clause pattern: {clause.topic} - {clause.clause_pattern[:50]}..."
+            f"Created invalid clause pattern with embedding: {clause.topic} - {clause.clause_pattern[:50]}..."
         )
 
     db.commit()
     return clause_ids
 
 
-def seed_legal_knowledge_base(db: Session) -> Dict[str, Any]:
+def _lookup_source_title_by_type(source_type: str) -> Optional[str]:
+    """Look up a source title from seed data by its source_type."""
+    from legal_kb.seed_data import get_seed_sources
+
+    seed_sources = get_seed_sources()
+    for src in seed_sources:
+        if src["source_type"] == source_type:
+            return src["title"]
+    return None
+
+
+def ingest_seed_bgh_rulings(db: Session, source_ids: Dict[str, int]) -> List[int]:
     """
-    Seed the entire legal knowledge base with initial data.
+    Ingest landmark BGH rulings as legal documents under the BGH case_law source.
 
     Returns:
-        Summary of what was created
+        List of created document IDs
     """
-    logger.info("Starting legal knowledge base seeding...")
+    rulings_data = get_seed_bgh_rulings()
+    ruling_ids = []
 
-    # Ingest sources
-    source_ids = ingest_seed_sources(db)
-    logger.info(f"Processed {len(source_ids)} legal sources")
+    # Look up the BGH source dynamically from seed data
+    bgh_source_title = _lookup_source_title_by_type("case_law")
+    if not bgh_source_title:
+        logger.warning("No case_law source found in seed data, skipping BGH rulings")
+        return ruling_ids
 
-    # Ingest documents
-    document_ids = ingest_seed_documents(db, source_ids)
-    logger.info(f"Processed {len(document_ids)} legal documents")
+    source_id = source_ids.get(bgh_source_title)
+    if not source_id:
+        logger.warning(
+            f"BGH source '{bgh_source_title}' not found in DB, skipping BGH rulings"
+        )
+        return ruling_ids
 
-    # Ingest invalid clause patterns
-    clause_ids = ingest_seed_invalid_clauses(db, source_ids)
-    logger.info(f"Processed {len(clause_ids)} invalid clause patterns")
+    for ruling in rulings_data:
+        citation = ruling["case"]
 
-    summary = {
-        "sources_created": len(source_ids),
-        "documents_created": len(document_ids),
-        "clauses_created": len(clause_ids),
-        "completed_at": datetime.utcnow().isoformat(),
+        # Check if ruling already exists
+        existing = (
+            db.query(LegalDocument)
+            .filter(
+                LegalDocument.source_id == source_id,
+                LegalDocument.citation == citation,
+            )
+            .first()
+        )
+
+        if existing:
+            ruling_ids.append(existing.id)
+            continue
+
+        # Format title and text
+        title = f"{citation} - {ruling['topic']}"
+        text = f"{citation} ({ruling['year']}): {ruling['summary']}"
+
+        document = LegalDocument(
+            source_id=source_id,
+            citation=citation,
+            title=title,
+            category="case_law",
+            text=text,
+            summary=ruling["summary"],
+            keywords=[f"year:{ruling['year']}", ruling["topic"]],
+        )
+
+        db.add(document)
+        db.flush()
+
+        # Create embedding for the ruling
+        chunks = chunk_text(text)
+        for i, chunk_text_content in enumerate(chunks):
+            embedding = embedding_service.encode_single(chunk_text_content)
+            chunk = LegalChunk(
+                document_id=document.id,
+                chunk_index=i,
+                text=chunk_text_content,
+                embedding=embedding,
+                token_count=len(chunk_text_content.split()),
+            )
+            db.add(chunk)
+
+        ruling_ids.append(document.id)
+        logger.info(f"Created BGH ruling document: {citation}")
+
+    db.commit()
+    return ruling_ids
+
+
+def clear_legal_knowledge_base(db: Session) -> Dict[str, int]:
+    """
+    Delete all legal knowledge base seed data from the database.
+
+    Deletes in the correct order to respect foreign key constraints:
+    1. InvalidClausePattern (no FKs to other seed tables)
+    2. LegalChunk (FK to LegalDocument)
+    3. LegalDocument (FK to LegalSource)
+    4. LegalSource
+
+    Returns:
+        Dict with counts of deleted records per table
+    """
+    from sqlalchemy import text as sa_text
+
+    logger.info("Clearing legal knowledge base...")
+
+    # Count before deletion
+    invalid_clause_count = db.query(InvalidClausePattern).count()
+    chunk_count = db.query(LegalChunk).count()
+    document_count = db.query(LegalDocument).count()
+    source_count = db.query(LegalSource).count()
+
+    # Delete in order: children first, then parents
+    db.query(InvalidClausePattern).delete()
+    db.query(LegalChunk).delete()
+    db.query(LegalDocument).delete()
+    db.query(LegalSource).delete()
+    db.commit()
+
+    logger.info(
+        f"Cleared {invalid_clause_count} invalid clauses, {chunk_count} chunks, "
+        f"{document_count} documents, {source_count} sources"
+    )
+
+    return {
+        "invalid_clauses_deleted": invalid_clause_count,
+        "chunks_deleted": chunk_count,
+        "documents_deleted": document_count,
+        "sources_deleted": source_count,
     }
-
-    logger.info(f"Legal knowledge base seeding completed: {summary}")
-    return summary
 
 
 def get_kb_stats(db: Session) -> Dict[str, Any]:
@@ -288,5 +413,5 @@ def get_kb_stats(db: Session) -> Dict[str, Any]:
         "documents": documents_count,
         "chunks": chunks_count,
         "invalid_clauses": clauses_count,
-        "total_embeddings": chunks_count,
+        "total_embeddings": chunks_count + clauses_count,
     }

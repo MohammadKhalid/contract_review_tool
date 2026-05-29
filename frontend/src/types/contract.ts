@@ -9,6 +9,11 @@ export interface ContractIssue {
   legal_basis?: string;
   clause_snippet?: string;
   similarity?: number;
+  // New fields from LLM judge
+  confidence?: number;
+  exact_quote?: string;
+  legal_citation?: string;
+  detection_method?: string; // "rule_based" | "llm" | "ocr_error"
 }
 
 export interface ContractAnalysisResult {

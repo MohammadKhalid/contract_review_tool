@@ -59,8 +59,18 @@
         "low": "Low Risk"
       },
       "legalBasis": "Legal Basis",
+      "legalCitation": "Legal Citation",
+      "exactQuote": "Exact Quote",
       "clauseSnippet": "Clause Excerpt",
-      "similarity": "Similarity: {score}%"
+      "similarity": "Similarity: {score}%",
+      "llmConfidence": "LLM Confidence: {score}%",
+      "actionRequired": "Action Required",
+      "ocrErrorMessage": "This section may have OCR quality issues. Manual review is recommended.",
+      "detectionMethod": {
+        "rule_based": "Rule-based",
+        "llm": "LLM Judge",
+        "ocr_error": "OCR Error"
+      }
     }
   },
   "language": {

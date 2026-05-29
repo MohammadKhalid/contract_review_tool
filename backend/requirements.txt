@@ -2,7 +2,8 @@ pydantic-settings==2.1.0
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-PyPDF2==3.0.1
+PyMuPDF==1.24.9
+pyspellchecker==0.7.2
 spacy==3.7.2
 de-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.7.0/de_core_news_sm-3.7.0-py3-none-any.whl
 pytesseract==0.3.10
@@ -15,6 +16,7 @@ pgvector==0.2.4
 sentence-transformers==2.2.2
 huggingface-hub==0.17.3
 numpy==1.24.3
+openai==1.12.0
 
 # Testing
 pytest==8.3.4
