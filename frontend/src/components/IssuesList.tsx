@@ -13,6 +13,7 @@ import {
   Shield,
   AlertOctagon,
 } from 'lucide-react';
+
 import type { ContractIssue } from '@/types/contract';
 import clsx from 'clsx';
 
@@ -41,10 +42,10 @@ const riskConfig = {
   },
 };
 
-const methodLabels: Record<string, { label: string; icon: typeof Bot }> = {
-  rule_based: { label: 'Rule-based', icon: Shield },
-  llm: { label: 'LLM Judge', icon: Bot },
-  ocr_error: { label: 'OCR Error', icon: AlertOctagon },
+const methodIcons: Record<string, typeof Bot> = {
+  rule_based: Shield,
+  llm: Bot,
+  ocr_error: AlertOctagon,
 };
 
 export default function IssuesList({ issues }: IssuesListProps) {
@@ -73,9 +74,6 @@ export default function IssuesList({ issues }: IssuesListProps) {
         const risk = (issue.risk_level?.toLowerCase() || 'low') as keyof typeof riskConfig;
         const config = riskConfig[risk] || riskConfig.low;
         const isExpanded = expandedIndex === index;
-        const methodInfo = issue.detection_method
-          ? methodLabels[issue.detection_method] || null
-          : null;
 
         return (
           <div
@@ -94,10 +92,13 @@ export default function IssuesList({ issues }: IssuesListProps) {
                   <span className={clsx('px-2.5 py-0.5 rounded-full text-xs font-semibold border', config.badge)}>
                     {t(`issues.risk.${risk}`)}
                   </span>
-                  {methodInfo && (
+                  {issue.detection_method && methodIcons[issue.detection_method] && (
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium border border-gray-600/30 bg-gray-800/40 text-gray-400 flex items-center gap-1">
-                      <methodInfo.icon className="w-3 h-3" />
-                      {methodInfo.label}
+                      {(() => {
+                        const Icon = methodIcons[issue.detection_method];
+                        return <Icon className="w-3 h-3" />;
+                      })()}
+                      {t(`issues.detectionMethod.${issue.detection_method}`)}
                     </span>
                   )}
                 </div>
@@ -146,7 +147,7 @@ export default function IssuesList({ issues }: IssuesListProps) {
                     <Scale className="w-4 h-4 text-blue-400 mt-0.5" />
                     <div>
                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
-                        Legal Citation
+                        {t('issues.legalCitation')}
                       </p>
                       <p className="text-sm text-blue-300 font-mono">{issue.legal_citation}</p>
                     </div>
@@ -158,7 +159,7 @@ export default function IssuesList({ issues }: IssuesListProps) {
                     <FileText className="w-4 h-4 text-amber-400 mt-0.5" />
                     <div>
                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
-                        Exact Quote
+                        {t('issues.exactQuote')}
                       </p>
                       <div className="bg-gray-800/60 rounded-lg p-3 border border-amber-800/30">
                         <p className="text-sm text-amber-200 italic">
@@ -191,7 +192,7 @@ export default function IssuesList({ issues }: IssuesListProps) {
                     <div>
                       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
                         {issue.confidence !== undefined
-                          ? `LLM Confidence: ${(issue.confidence * 100).toFixed(1)}%`
+                          ? t('issues.llmConfidence', { score: (issue.confidence * 100).toFixed(1) })
                           : t('issues.similarity', { score: Math.round(issue.similarity! * 100) })}
                       </p>
                     </div>
@@ -203,10 +204,10 @@ export default function IssuesList({ issues }: IssuesListProps) {
                     <AlertOctagon className="w-4 h-4 text-red-400 mt-0.5" />
                     <div>
                       <p className="text-xs font-medium text-red-400 uppercase tracking-wider mb-1">
-                        Action Required
+                        {t('issues.actionRequired')}
                       </p>
                       <p className="text-sm text-gray-300">
-                        This section may have OCR quality issues. Manual review is recommended.
+                        {t('issues.ocrErrorMessage')}
                       </p>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import { Scale, Shield, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import ResultsDisplay from '@/components/ResultsDisplay';
@@ -14,6 +14,7 @@ import {
   setAnalysisError,
   resetAnalysis,
   setFileName,
+  clearAnalysisResultsOnly,
 } from '@/lib/analysisStore';
 
 const RESULTS_KEY = 'contract_analysis_results';
@@ -43,6 +44,13 @@ function clearResults() {
 export default function HomePage() {
   const t = useTranslations();
   const tFeatures = useTranslations('app.features');
+  const currentLocale = useLocale();
+
+  // Always use the latest locale value at call time (avoids stale closures in event handlers and setTimeout)
+  const localeRef = useRef(currentLocale);
+  useEffect(() => {
+    localeRef.current = currentLocale;
+  }, [currentLocale]);
 
   // Initialize from module-level store first, then fall back to localStorage
   const store = getAnalysisState();
@@ -77,6 +85,21 @@ export default function HomePage() {
     }
   }, []);
 
+  // When language changes, clear old results (they have descriptions in the wrong language)
+  // but keep the filename so we can show a helpful "re-select this file" message.
+  const prevLocaleRef = useRef(currentLocale);
+  useEffect(() => {
+    if (prevLocaleRef.current !== currentLocale) {
+      setResults(null);
+      clearResults();                 // clear localStorage
+      clearAnalysisResultsOnly();     // clear module store results but preserve fileName
+      setError(null);
+      setUploadState('idle');
+
+      prevLocaleRef.current = currentLocale;
+    }
+  }, [currentLocale]);
+
   const handleFileSelect = useCallback((file: File) => {
     setSelectedFile(file);
     setSelectedFileName(file.name);
@@ -86,6 +109,8 @@ export default function HomePage() {
     clearResults();
     resetAnalysis();
     setUploadState('idle');
+    // Do NOT auto-start analysis here. User must click the Analyze button
+    // so they explicitly control when the (lang-aware) request is sent.
   }, []);
 
   const handleAnalyze = useCallback(async () => {
@@ -94,7 +119,7 @@ export default function HomePage() {
     setUploadState('analyzing');
     setError(null);
 
-    const promise = analyzeContract(selectedFile);
+    const promise = analyzeContract(selectedFile, localeRef.current);
 
     // Store the pending analysis in module-level store
     setAnalysisPending(selectedFile.name, promise);
@@ -217,7 +242,7 @@ export default function HomePage() {
           {!selectedFile && selectedFileName && !showAnalyzing && (
             <div className="flex justify-center mt-8 animate-fade-in">
               <p className="text-sm text-yellow-400 bg-yellow-900/20 rounded-xl px-4 py-3 border border-yellow-800/30 text-center max-w-md">
-                Previously selected: {selectedFileName}. Please re-select the file to analyze.
+                Language changed. Please re-select <strong>{selectedFileName}</strong> to get the analysis with {currentLocale === 'de' ? 'German' : 'English'} descriptions.
               </p>
             </div>
           )}

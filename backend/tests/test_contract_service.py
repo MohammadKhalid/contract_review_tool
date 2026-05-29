@@ -6,6 +6,7 @@ Tests pure business logic functions independently from FastAPI/HTTP.
 from unittest.mock import MagicMock, patch
 from io import BytesIO
 
+import asyncio
 import pytest
 
 from services.contract_service import (
@@ -193,7 +194,7 @@ class TestDetectLegalIssues:
             "services.contract_service.check_clause_against_patterns",
             return_value=[],
         ):
-            issues = detect_legal_issues(mock_db_session, ["Clean clause."])
+            issues = asyncio.run(detect_legal_issues(mock_db_session, ["Clean clause."]))
             assert issues == []
 
     def test_detects_kaution_issue(self, mock_db_session, mock_clause_pattern_matches):
@@ -202,10 +203,10 @@ class TestDetectLegalIssues:
             "services.contract_service.check_clause_against_patterns",
             return_value=[mock_clause_pattern_matches[0]],
         ):
-            issues = detect_legal_issues(
+            issues = asyncio.run(detect_legal_issues(
                 mock_db_session,
                 ["Der Mieter leistet eine Kaution in Höhe von vier Monatsmieten."],
-            )
+            ))
             assert len(issues) == 1
             assert issues[0].risk_level == "high"
             assert "Kaution" in issues[0].description
@@ -230,7 +231,7 @@ class TestDetectLegalIssues:
                 "Der Mieter leistet eine Kaution in Höhe von vier Monatsmieten.",
                 "Die Nebenkosten betragen pauschal 150€ pro Monat.",
             ]
-            issues = detect_legal_issues(mock_db_session, clauses)
+            issues = asyncio.run(detect_legal_issues(mock_db_session, clauses))
             assert len(issues) == 2
             # Should be sorted by similarity (highest first)
             assert issues[0].risk_level == "high"
@@ -241,7 +242,7 @@ class TestDetectLegalIssues:
             "services.contract_service.check_clause_against_patterns",
             return_value=[{"why_invalid": "test", "risk_level": "high"}],
         ):
-            issues = detect_legal_issues(mock_db_session, ["Short."], min_length=20)
+            issues = asyncio.run(detect_legal_issues(mock_db_session, ["Short."], min_length=20))
             assert issues == []
 
     def test_deduplicates_identical_issues(self, mock_db_session):
@@ -256,11 +257,11 @@ class TestDetectLegalIssues:
             "services.contract_service.check_clause_against_patterns",
             return_value=[mock_match],
         ):
-            issues = detect_legal_issues(
+            issues = asyncio.run(detect_legal_issues(
                 mock_db_session,
                 ["Erste Klausel mit Problem.", "Zweite Klausel mit Problem."],
                 min_length=5,
-            )
+            ))
             # Both clauses produce identical descriptions, so only 1 issue
             assert len(issues) == 1
 
@@ -277,9 +278,9 @@ class TestDetectLegalIssues:
         ):
             # Create 20 unique clauses that each produce a unique description
             clauses = [f"Einzigartige Klausel Nummer {i}" for i in range(20)]
-            issues = detect_legal_issues(
+            issues = asyncio.run(detect_legal_issues(
                 mock_db_session, clauses, min_length=5, max_issues=5
-            )
+            ))
             assert len(issues) == 5
 
 

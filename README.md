@@ -23,7 +23,8 @@ An AI-powered application that analyzes German rental contracts (Mietverträge) 
 
 ### Frontend
 
-- HTML, CSS, JavaScript (Vanilla)
+- Next.js (App Router) + TypeScript + Tailwind CSS
+- next-intl for internationalization (English + German)
 
 ### Devops
 
@@ -405,9 +406,11 @@ contract_review_tool/
 │       └── test_routers_legal_kb.py
 │
 ├── frontend/
-│   ├── index.html
-│   ├── script.js
-│   ├── style.css
+│   ├── src/                       # Next.js application
+│   ├── messages/                  # i18n translations (en.json, de.json)
+│   ├── public/
+│   ├── package.json
+│   ├── next.config.mjs
 │   └── Dockerfile
 │
 ├── docker-compose.yml

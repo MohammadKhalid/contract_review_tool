@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     LLM_SEARCH_LIMIT: int = 3
     LLM_CONFIDENCE_THRESHOLD: float = 0.6
 
+    # LLM / Parallelism tuning (new for performance)
+    LLM_CONCURRENCY: int = 6          # Max concurrent LLM calls
+    LLM_JUDGE_THRESHOLD: float = 0.75 # Higher threshold to decide whether to call the expensive LLM judge
+    LLM_BATCH_SIZE: int = 3           # Number of clauses to judge in one LLM call (reduces round-trips)
+
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

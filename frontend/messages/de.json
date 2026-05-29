@@ -59,8 +59,18 @@
         "low": "Niedriges Risiko"
       },
       "legalBasis": "Rechtliche Grundlage",
+      "legalCitation": "Rechtliche Zitierung",
+      "exactQuote": "Exaktes Zitat",
       "clauseSnippet": "Klausel-Auszug",
-      "similarity": "Ähnlichkeit: {score}%"
+      "similarity": "Ähnlichkeit: {score}%",
+      "llmConfidence": "LLM-Konfidenz: {score}%",
+      "actionRequired": "Handlungsbedarf",
+      "ocrErrorMessage": "Dieser Abschnitt könnte OCR-Qualitätsprobleme aufweisen. Eine manuelle Überprüfung wird empfohlen.",
+      "detectionMethod": {
+        "rule_based": "Regelbasiert",
+        "llm": "LLM-Prüfung",
+        "ocr_error": "OCR-Fehler"
+      }
     }
   },
   "language": {
