@@ -284,7 +284,7 @@ def split_into_clauses(text: str, doc: spacy.tokens.Doc) -> List[str]:
 def detect_legal_issues(
     db: Session,
     clauses: List[str],
-    min_length: int = 20,
+    min_length: int = 1,
     max_issues: int = 10,
 ) -> List[ContractIssue]:
     """
@@ -380,7 +380,7 @@ def detect_legal_issues(
                 matched_pattern_info = top_patterns[0] if top_patterns else None
 
             desc = (
-                f"LLM-flagged: {llm_result.get('reason', 'Potential invalid clause')[:150]}. "
+                f"LLM-flagged: {llm_result.get('reason', 'Potential invalid clause')}. "
                 f"Pattern: {matched_pattern_info.get('topic', 'unknown') if matched_pattern_info else 'unknown'}"
             )
 

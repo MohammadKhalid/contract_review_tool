@@ -44,7 +44,7 @@ def search_similar_chunks(
             lc.chunk_index,
             lc.text,
             lc.token_count,
-            lc.embedding <=> :query_embedding as similarity,
+            lc.embedding <=> CAST(:query_embedding AS vector) as similarity,
             ld.title as document_title,
             ld.citation,
             ld.category,
@@ -55,8 +55,8 @@ def search_similar_chunks(
         FROM legal_chunks lc
         JOIN legal_documents ld ON lc.document_id = ld.id
         JOIN legal_sources ls ON ld.source_id = ls.id
-        WHERE lc.embedding <=> :query_embedding < :threshold
-        ORDER BY lc.embedding <=> :query_embedding
+        WHERE lc.embedding <=> CAST(:query_embedding AS vector) < :threshold
+        ORDER BY lc.embedding <=> CAST(:query_embedding AS vector)
         LIMIT :limit
     """)
 
@@ -188,11 +188,11 @@ def retrieve_top_invalid_patterns(
             recommended_response,
             bgb_citation,
             bgb_text_excerpt,
-            embedding <=> :query_embedding as distance
+            embedding <=> CAST(:query_embedding AS vector) as distance
         FROM invalid_clause_patterns
         WHERE embedding IS NOT NULL
-          AND embedding <=> :query_embedding < :threshold
-        ORDER BY embedding <=> :query_embedding
+          AND embedding <=> CAST(:query_embedding AS vector) < :threshold
+        ORDER BY embedding <=> CAST(:query_embedding AS vector)
         LIMIT :limit
     """)
 

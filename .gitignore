@@ -225,7 +225,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 backend/uploads/
-alembic/
 uploads/
 *.pdf
 

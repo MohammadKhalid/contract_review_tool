@@ -3,10 +3,8 @@ Ingestion module for legal knowledge base.
 Handles loading seed data and generating embeddings.
 """
 
-import hashlib
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from datetime import datetime
 import logging
 
 from models.legal_kb import LegalSource, LegalDocument, LegalChunk, InvalidClausePattern
@@ -19,11 +17,6 @@ from legal_kb.seed_data import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def calculate_content_hash(text: str) -> str:
-    """Calculate SHA256 hash of text content for change detection."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
@@ -98,7 +91,10 @@ def ingest_seed_sources(db: Session) -> Dict[str, int]:
             source_ids[source_data["title"]] = existing.id
             continue
 
-        # Create new source
+        # Create new source.
+        # Note: A 'content_hash' field was previously referenced in this code
+        # for change detection, but the column was never added to the model.
+        # The feature is currently unused, so we omit it.
         source = LegalSource(
             source_type=source_data["source_type"],
             title=source_data["title"],
@@ -106,7 +102,6 @@ def ingest_seed_sources(db: Session) -> Dict[str, int]:
             publisher=source_data.get("publisher"),
             source_url=source_data.get("source_url"),
             license_note=source_data.get("license_note"),
-            content_hash=calculate_content_hash(source_data["title"]),
         )
 
         db.add(source)
@@ -158,7 +153,7 @@ def ingest_seed_documents(db: Session, source_ids: Dict[str, int]) -> List[int]:
             category=doc_data.get("category"),
             text=doc_data["text"],
             summary=doc_data.get("summary"),
-            metadata_json=doc_data.get("metadata_json", {}),
+            keywords=doc_data.get("keywords"),
         )
 
         db.add(document)
@@ -337,7 +332,7 @@ def ingest_seed_bgh_rulings(db: Session, source_ids: Dict[str, int]) -> List[int
             category="case_law",
             text=text,
             summary=ruling["summary"],
-            metadata_json={"year": ruling["year"], "topic": ruling["topic"]},
+            keywords=[f"year:{ruling['year']}", ruling["topic"]],
         )
 
         db.add(document)

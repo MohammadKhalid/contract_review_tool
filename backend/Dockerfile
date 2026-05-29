@@ -21,6 +21,11 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 # Copy application code
 COPY . .
 
+# Ensure the entrypoint script is executable (defensive for image builds)
+RUN chmod +x docker-entrypoint.sh
+
 EXPOSE 5001
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5001"]
+# Run migrations via the entrypoint before starting the app.
+# The entrypoint executes `alembic upgrade head` then starts uvicorn.
+ENTRYPOINT ["./docker-entrypoint.sh"]

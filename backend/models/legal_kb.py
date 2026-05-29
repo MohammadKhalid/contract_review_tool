@@ -60,7 +60,7 @@ class LegalChunk(Base):
     chunk_index = Column(Integer, nullable=False)  # Order within document
     text = Column(Text, nullable=False)  # Chunk text
     embedding = Column(
-        Vector(384)
+        Vector(384), nullable=False
     )  # 384 dimensions for paraphrase-multilingual-MiniLM-L12-v2
     token_count = Column(Integer, nullable=True)
     metadata_json = Column(JSON, nullable=True)  # Additional chunk metadata
