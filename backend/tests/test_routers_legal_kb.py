@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.dependencies import get_db, get_embedding_service
+from core.auth import get_current_principal
 from routers.legal_kb import router as legal_kb_router
 from schemas.legal_kb import (
     InvalidClauseCheckResponse,
@@ -27,7 +28,9 @@ from schemas.legal_kb import (
 
 
 def create_test_app(mock_db, mock_embedding=None):
-    """Create a FastAPI test app with overridden dependencies."""
+    """Create a FastAPI test app with overridden dependencies (including auth)."""
+    from core.auth import Principal
+
     app = FastAPI()
     app.include_router(legal_kb_router)
 
@@ -36,6 +39,10 @@ def create_test_app(mock_db, mock_embedding=None):
 
     if mock_embedding:
         app.dependency_overrides[get_embedding_service] = lambda: mock_embedding
+
+    # Provide admin principal so all existing KB tests (including seed) continue to pass
+    test_admin = Principal(role="admin", token="test-admin-key", is_admin=True)
+    app.dependency_overrides[get_current_principal] = lambda: test_admin
 
     return app
 

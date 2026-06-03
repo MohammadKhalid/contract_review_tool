@@ -86,5 +86,31 @@
     "general": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
     "notFound": "Seite nicht gefunden",
     "serverError": "Serverfehler. Der Dienst ist möglicherweise nicht verfügbar."
+  },
+  "paywall": {
+    "title": "Analyse freischalten",
+    "description": "Kaufen Sie einmalig Zugang, um deutsche Mietverträge zu analysieren. Ihr Lizenzschlüssel wird sofort nach der Zahlung bereitgestellt.",
+    "buyCta": "Für €2 analysieren",
+    "enterKeyCta": "Ich habe bereits einen Lizenzschlüssel",
+    "enterKeyHelp": "Fügen Sie den Lizenzschlüssel ein, den Sie nach dem Kauf oder per E-Mail erhalten haben.",
+    "keyPlaceholder": "POLAR-XXXX-YYYY-...",
+    "enterKeyError": "Bitte geben Sie einen gültigen Lizenzschlüssel ein",
+    "noKey": "Kein Zugangsschlüssel — Kauf erforderlich"
+  },
+  "license": {
+    "title": "Zugangsschlüssel",
+    "active": "Zugangsschlüssel aktiv",
+    "saved": "Lizenzschlüssel gespeichert. Sie können jetzt Verträge analysieren.",
+    "cleared": "Lizenzschlüssel entfernt.",
+    "save": "Speichern",
+    "clear": "Schlüssel entfernen",
+    "hasKey": "Zugangsschlüssel aktiv"
+  },
+  "purchase": {
+    "successTitle": "Zahlung erfolgreich!",
+    "keyLabel": "Ihr Zugangsschlüssel",
+    "copy": "Schlüssel kopieren",
+    "continue": "Zum Analyzer",
+    "errorResolving": "Lizenzschlüssel konnte nicht automatisch abgerufen werden. Prüfen Sie Ihre E-Mails oder das Polar-Kundenportal."
   }
 }

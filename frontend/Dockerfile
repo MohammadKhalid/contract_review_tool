@@ -6,7 +6,9 @@ WORKDIR /app
 COPY package.json ./
 
 # Install all dependencies (dev included for build)
-RUN npm install
+# --legacy-peer-deps is required because @polar-sh/nextjs currently declares
+# a peerDependency on Next.js ^15, while this project is still on Next 14.
+RUN npm install --legacy-peer-deps
 
 # Copy all source files
 COPY tsconfig.json next.config.mjs tailwind.config.ts postcss.config.mjs ./
@@ -32,6 +34,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/messages ./messages
+# Note: app/ routes are included via the standalone output from the build step above.
 
 # Copy node_modules for standalone server
 COPY --from=builder /app/node_modules ./node_modules

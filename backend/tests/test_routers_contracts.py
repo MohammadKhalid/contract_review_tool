@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.dependencies import get_db, get_nlp_model
+from core.auth import get_current_principal
 from routers.contracts import router as contracts_router
 from schemas.contract import (
     ContractAnalysisResponse,
@@ -26,13 +27,20 @@ from tests.conftest import MockDoc
 
 
 def create_test_app(mock_db, mock_nlp):
-    """Create a FastAPI test app with overridden dependencies."""
+    """Create a FastAPI test app with overridden dependencies (including auth)."""
+    from core.auth import Principal
+
     app = FastAPI()
     app.include_router(contracts_router)
 
     # Override dependencies
     app.dependency_overrides[get_db] = lambda: mock_db
     app.dependency_overrides[get_nlp_model] = lambda: mock_nlp
+
+    # Always provide a valid admin principal for existing tests.
+    # This keeps test churn minimal while still exercising the auth dependency.
+    test_admin = Principal(role="admin", token="test-admin-key", is_admin=True)
+    app.dependency_overrides[get_current_principal] = lambda: test_admin
 
     return app
 

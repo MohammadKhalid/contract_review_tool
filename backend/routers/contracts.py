@@ -10,6 +10,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import spacy
 
+from core.auth import get_current_principal, Principal
 from core.dependencies import get_db, get_nlp_model
 from core.exceptions import AppException, BadRequestException, FileProcessingException
 from core.logging import get_logger
@@ -34,9 +35,11 @@ async def analyze_contract_endpoint(
     lang: str = Query("de", description="Language for issue descriptions ('en' or 'de')"),
     db: Session = Depends(get_db),
     nlp: spacy.Language = Depends(get_nlp_model),
+    principal: Principal = Depends(lambda: get_current_principal(increment_usage=1)),
 ):
     """
     Upload and analyze a contract PDF.
+    Requires a valid access token (admin key or Polar license key after payment).
     Extracts text, performs legal analysis using knowledge base, and returns results.
     """
     try:
