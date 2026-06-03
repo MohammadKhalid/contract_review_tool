@@ -229,3 +229,6 @@ uploads/
 *.pdf
 
 .DS_Store
+.grok
+.docker-cache/
+AGENTS.md

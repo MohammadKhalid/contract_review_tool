@@ -2,13 +2,24 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { useTransition } from 'react';
+import { useTransition, useState, useEffect } from 'react';
+import { isPostPurchaseLoading, subscribePostPurchaseLoading } from '@/lib/analysisStore';
 
 export default function LanguageSwitcher() {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
+  const [loadingLocked, setLoadingLocked] = useState(isPostPurchaseLoading());
+
+  useEffect(() => {
+    const unsub = subscribePostPurchaseLoading(() => {
+      setLoadingLocked(isPostPurchaseLoading());
+    });
+    // also sync initial
+    setLoadingLocked(isPostPurchaseLoading());
+    return unsub;
+  }, []);
 
   const switchLocale = (newLocale: string) => {
     startTransition(() => {
@@ -25,7 +36,7 @@ export default function LanguageSwitcher() {
         <button
           key={lang}
           onClick={() => switchLocale(lang)}
-          disabled={isPending}
+          disabled={isPending || loadingLocked}
           role="radio"
           aria-checked={locale === lang}
           className={`

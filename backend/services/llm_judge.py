@@ -14,6 +14,74 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+import httpx
+
+# Shared HTTP clients to avoid the "AsyncHttpxClientWrapper has no attribute '_state'" error.
+# This is a known issue when creating many short-lived AsyncOpenAI clients.
+# We create one httpx.AsyncClient and pass it explicitly to AsyncOpenAI.
+# See: https://github.com/openai/openai-python/issues/1017 and related reports.
+
+_xai_http_client: Optional[httpx.AsyncClient] = None
+_xai_async_client: Optional["AsyncOpenAI"] = None
+_xai_sync_client: Optional["OpenAI"] = None
+
+
+def _get_xai_http_client() -> httpx.AsyncClient:
+    """Return a shared httpx.AsyncClient (created once)."""
+    global _xai_http_client
+    if _xai_http_client is None:
+        _xai_http_client = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+            timeout=httpx.Timeout(60.0),
+        )
+    return _xai_http_client
+
+
+def get_xai_async_client() -> "AsyncOpenAI":
+    """Return a singleton AsyncOpenAI client for xAI API calls."""
+    global _xai_async_client
+    if _xai_async_client is None:
+        from openai import AsyncOpenAI
+
+        _xai_async_client = AsyncOpenAI(
+            api_key=settings.XAI_API_KEY,
+            base_url="https://api.x.ai/v1",
+            http_client=_get_xai_http_client(),  # Explicit client avoids wrapper state bugs
+        )
+    return _xai_async_client
+
+
+def get_xai_client() -> "OpenAI":
+    """Return a singleton (sync) OpenAI client for xAI API calls."""
+    global _xai_sync_client
+    if _xai_sync_client is None:
+        from openai import OpenAI
+
+        _xai_sync_client = OpenAI(
+            api_key=settings.XAI_API_KEY,
+            base_url="https://api.x.ai/v1",
+        )
+    return _xai_sync_client
+
+
+async def close_xai_async_client() -> None:
+    """Gracefully close the shared async clients (call during app shutdown)."""
+    global _xai_async_client, _xai_http_client
+
+    if _xai_async_client is not None:
+        try:
+            await _xai_async_client.aclose()
+        except Exception:
+            pass
+        _xai_async_client = None
+
+    if _xai_http_client is not None:
+        try:
+            await _xai_http_client.aclose()
+        except Exception:
+            pass
+        _xai_http_client = None
+
 
 # ====================================================================
 # Structured output schema (OpenAI Structured Outputs / JSON Schema)
@@ -200,12 +268,7 @@ def judge_section(
     user_prompt = f"{intro}\n\n{user_prompt}"
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.x.ai/v1",
-        )
+        client = get_xai_client()  # shared sync client
 
         # Prepare the JSON schema from the Pydantic model
         schema = ClauseJudgment.model_json_schema()
@@ -327,12 +390,7 @@ async def judge_section_async(
     user_prompt = f"{intro}\n\n{user_prompt}"
 
     try:
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://api.x.ai/v1",
-        )
+        client = get_xai_async_client()
 
         schema = ClauseJudgment.model_json_schema()
         if not is_german:
@@ -357,6 +415,7 @@ async def judge_section_async(
         )
 
         content = response.choices[0].message.content.strip()
+        logger.debug("LLM single judge raw response: %s", content[:300])
         parsed = ClauseJudgment.model_validate_json(content)
 
         result = {
@@ -495,12 +554,7 @@ async def batch_judge_sections(
     user_prompt = f"{intro}\n\n{user_prompt}"
 
     try:
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://api.x.ai/v1",
-        )
+        client = get_xai_async_client()
 
         # Schema for the batch wrapper
         schema = BatchJudgmentOutput.model_json_schema()
@@ -529,6 +583,7 @@ async def batch_judge_sections(
         )
 
         content = response.choices[0].message.content.strip()
+        logger.debug("LLM batch judge raw response: %s", content[:800])
         parsed = BatchJudgmentOutput.model_validate_json(content)
 
         results = []

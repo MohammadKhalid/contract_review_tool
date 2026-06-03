@@ -9,6 +9,9 @@ from io import BytesIO
 import pytest
 from sqlalchemy.orm import Session
 
+# Import for test auth override
+from core.auth import Principal
+
 # ============================================================
 # Mock helpers
 # ============================================================
@@ -215,3 +218,25 @@ def mock_clause_pattern_matches():
             "similarity": 0.85,
         },
     ]
+
+
+# ============================================================
+# Auth test fixtures (for paywall / admin auth)
+# ============================================================
+
+
+@pytest.fixture
+def test_admin_principal():
+    """A fake admin Principal for test overrides (bypasses Polar validation)."""
+    return Principal(role="admin", token="test-admin-key", is_admin=True)
+
+
+@pytest.fixture
+def test_user_principal():
+    """A fake paying user Principal (simulates valid Polar license key)."""
+    return Principal(
+        role="user",
+        token="TEST-LICENSE-KEY-1234",
+        polar_validation={"status": "granted", "usage": 0, "limit_usage": None},
+        is_admin=False,
+    )

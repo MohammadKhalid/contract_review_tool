@@ -267,6 +267,103 @@ curl -X POST "http://localhost:5001/legal-kb/check-clause?clause_text=Der%20Miet
 | GET    | `/legal-kb/sources`         | List legal sources                                             |
 | GET    | `/legal-kb/documents`       | Browse legal documents                                         |
 
+## Authentication & Paywall (Polar.sh)
+
+All API endpoints (except `/health`) now require a valid access token. There are two types:
+
+- **Admin token** (`ADMIN_API_KEY`): Full access, including the admin-only `/legal-kb/seed` endpoint. Set in your `.env`.
+- **User / Paying token**: A Polar.sh license key obtained after completing a one-time purchase via the embedded checkout in the frontend.
+
+Regular users **cannot** call `/contracts/analyze` (or any other endpoint) until they complete payment.
+
+### Quick Polar Setup (One-time Purchase + License Keys) — CRITICAL
+
+**The #1 reason you get "Could not find a license key" after a successful checkout is that the product in Polar has no License Key benefit attached.**
+
+1. Sign up at [polar.sh](https://polar.sh) (use Sandbox for testing).
+2. In your org dashboard:
+   - Create a **Product** (type: One-time) → e.g. "Contract Analysis Access Pass".
+   - **Add a License Key benefit** to the product (this is mandatory).
+     - Go to the product → Benefits tab → Add benefit → choose **License Keys**.
+     - Configure prefix, usage limits, etc. as desired.
+3. Go to Organization Settings → Access Tokens → create an Organization Access Token (OAT) with `license_keys:read` + `license_keys:write` scopes.
+4. Copy the token + your Organization ID into `.env`.
+5. Set `POLAR_ANALYSIS_PRODUCT_ID` to your product's ID.
+6. (Required for automatic delivery) Create a Webhook in Polar pointing to your ngrok URL + `/api/webhook/polar` and copy the secret as `POLAR_WEBHOOK_SECRET`.
+7. Start the app and test.
+
+**If you skip step 2 (adding the License Key benefit), `licenseKeys.list` will always return 0 keys and the webhook will never deliver anything.**
+
+### Troubleshooting: "No license key found" after successful purchase
+
+If checkout succeeds but you always get 404 from `/api/polar/resolve-key`:
+
+1. Go to the Polar dashboard and check the specific customer/order.
+2. Confirm that a **License Key benefit** is attached to the product and that a key was actually generated.
+3. Check that your `POLAR_WEBHOOK_SECRET` is correctly passed into the `frontend-dev` container (see docker-compose.yml).
+4. Look for `[Polar Webhook]` logs when you complete a purchase or resend the event.
+
+Only after the benefit is properly attached will the automatic flow work.
+
+The frontend uses Polar's embedded checkout for a smooth experience (no full-page redirect). After success the key is resolved server-side and the user can immediately analyze.
+
+> **Note on npm dependencies**: `@polar-sh/nextjs` currently declares a peer dependency on Next.js 15, while this project is still on Next 14.  
+> We use `--legacy-peer-deps` when installing.  
+> If you run `npm install` manually inside `frontend/`, use:
+> ```bash
+> cd frontend && npm install --legacy-peer-deps
+> ```
+
+### Using the API with a Token (curl examples)
+
+**Admin (full access):**
+```bash
+curl -X POST "http://localhost:5001/contracts/analyze?lang=de" \
+  -H "X-API-Key: $ADMIN_API_KEY" \
+  -F "file=@contract.pdf"
+```
+
+**Paying user (after Polar purchase):**
+```bash
+curl -X POST "http://localhost:5001/contracts/analyze?lang=de" \
+  -H "X-API-Key: POLAR-XXXX-YYYY-ZZZZ" \
+  -F "file=@contract.pdf"
+```
+
+**Seed (admin only):**
+```bash
+curl -X POST "http://localhost:5001/legal-kb/seed?reset=false" \
+  -H "X-API-Key: $ADMIN_API_KEY"
+```
+
+All other KB endpoints also require a valid key (admin or paying license).
+
+### Environment Variables
+
+See `.env_template` for the full Polar + admin section with comments.
+
+Key vars:
+- `ADMIN_API_KEY` – your long random admin secret
+- `POLAR_ACCESS_TOKEN`, `POLAR_ORGANIZATION_ID`, `POLAR_SERVER=sandbox`
+- `POLAR_ANALYSIS_PRODUCT_ID` (recommended)
+
+### Testing the Paywall End-to-End (Sandbox)
+
+1. Set `POLAR_SERVER=sandbox` + valid sandbox credentials + a test product with License Key benefit.
+2. Load the frontend, select a PDF, click the buy button.
+3. Complete checkout with Polar's test card (`4242 4242 4242 4242` etc.).
+4. On success the license key appears, is auto-saved, and analysis works immediately.
+5. Try calling the API without a key → you get 401/402.
+
+Switch `POLAR_SERVER=production` and create a real product when you're ready to charge real money. Polar handles all tax compliance as Merchant of Record.
+
+### Disabling / Local Development
+
+- If you only ever use the admin key, you can leave Polar fields empty. The app will still require a token (the admin one).
+- Never commit real Polar tokens or your `ADMIN_API_KEY`.
+
+This design keeps the paywall enforcement on the backend while delivering a great frontend experience via Polar's excellent embedded checkout and license key delivery.
+
 ## Legal Knowledge Base
 
 The application includes a comprehensive German rental law knowledge base with vector search capabilities:

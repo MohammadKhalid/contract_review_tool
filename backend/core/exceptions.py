@@ -57,3 +57,27 @@ class DatabaseException(AppException):
 
     def __init__(self, message: str = "Database operation failed"):
         super().__init__(message=message, status_code=500)
+
+
+# --- Authentication / Paywall exceptions ---
+
+
+class UnauthorizedException(AppException):
+    """Missing, invalid, or expired access token."""
+
+    def __init__(self, message: str = "Invalid or missing access token"):
+        super().__init__(message=message, status_code=401)
+
+
+class PaymentRequiredException(AppException):
+    """Payment required to access this resource (Polar paywall)."""
+
+    def __init__(self, message: str = "Payment required. Purchase an access pass to continue."):
+        super().__init__(message=message, status_code=402)
+
+
+class ForbiddenException(AppException):
+    """Authenticated but insufficient permissions (e.g. admin-only action)."""
+
+    def __init__(self, message: str = "Forbidden"):
+        super().__init__(message=message, status_code=403)

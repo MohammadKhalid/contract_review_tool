@@ -76,6 +76,17 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
+    # Admin Authentication (static key for internal/admin access, bypasses Polar)
+    ADMIN_API_KEY: str = Field(default="", alias="ADMIN_API_KEY")
+
+    # Polar.sh Paywall & License Key Integration
+    # Get these from your Polar organization settings after creating a one-time Product + License Key benefit.
+    # Use POLAR_SERVER=sandbox for testing (default). Switch to "production" for live sales.
+    POLAR_ACCESS_TOKEN: str = Field(default="", alias="POLAR_ACCESS_TOKEN")
+    POLAR_ORGANIZATION_ID: str = Field(default="", alias="POLAR_ORGANIZATION_ID")
+    POLAR_SERVER: str = Field(default="sandbox", alias="POLAR_SERVER")  # "sandbox" or "production"
+    POLAR_ANALYSIS_PRODUCT_ID: Optional[str] = Field(default=None, alias="POLAR_ANALYSIS_PRODUCT_ID")
+
     @model_validator(mode="after")
     def build_database_url(self) -> "Settings":
         """

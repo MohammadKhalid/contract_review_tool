@@ -5,9 +5,7 @@ const withNextIntl = createNextIntlPlugin();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  experimental: {
-    serverActions: true,
-  },
+  // serverActions is enabled by default in Next.js 14+
 };
 
 export default withNextIntl(nextConfig);

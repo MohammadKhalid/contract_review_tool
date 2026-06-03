@@ -3,6 +3,7 @@ German Rental Contract Review API
 Main application entry point.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,26 +14,17 @@ from database.connection import create_tables
 from routers.legal_kb import router as legal_kb_router
 from routers.contracts import router as contracts_router
 
+from services.llm_judge import close_xai_async_client
+from core.auth import close_polar_client
+
 # Setup centralized logging
 setup_logging()
 logger = get_logger(__name__)
 
-app = FastAPI(
-    title=settings.APP_TITLE,
-    version=settings.APP_VERSION,
-)
-
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
-    Application startup handler.
-
-    By default we rely on the Docker entrypoint (docker-entrypoint.sh) having
-    already run `alembic upgrade head`. This is the recommended production path.
-
-    For development, CI, or environments that prefer the old behavior,
-    set AUTO_CREATE_TABLES=true to fall back to the legacy create_all() path.
+    Modern FastAPI lifespan handler.
     """
     logger.info("Starting up %s", settings.APP_TITLE)
 
@@ -55,6 +47,31 @@ async def startup_event():
             "AUTO_CREATE_TABLES is not set — assuming database schema was already "
             "initialized by Alembic migrations (docker-entrypoint.sh)."
         )
+
+    yield  # Application runs here
+
+    # Shutdown
+    logger.info("Shutting down — closing shared async HTTP clients...")
+    await close_xai_async_client()
+    await close_polar_client()
+
+
+app = FastAPI(
+    title=settings.APP_TITLE,
+    version=settings.APP_VERSION,
+    lifespan=lifespan,
+)
+
+
+# Public health endpoint (used by docker-compose healthcheck and orchestrators)
+@app.get("/health", tags=["system"])
+async def health_check():
+    """Simple health check — does not require authentication."""
+    return {
+        "status": "healthy",
+        "app": settings.APP_TITLE,
+        "version": settings.APP_VERSION,
+    }
 
 
 # Include routers
