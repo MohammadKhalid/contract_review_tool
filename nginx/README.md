@@ -58,4 +58,25 @@ For quick http-only testing (before you have certs) you can leave the port-80 se
 - Add security headers, rate limiting, etc. as needed.
 - If you later prefer Caddy (auto TLS via Let's Encrypt with almost zero config), replace the nginx service in docker-compose.yml with a caddy one + a root `Caddyfile`; only compose + one new file change.
 
+## Accessing the Backend API Docs (Swagger UI / ReDoc) on prod
+
+The FastAPI backend serves its interactive documentation at:
+
+- Swagger UI: `https://yourdomain.com/docs`
+- ReDoc: `https://yourdomain.com/redoc`
+- OpenAPI schema: `https://yourdomain.com/openapi.json`
+
+These paths are proxied to the backend service (see the added `location /docs`, `/redoc`, `/openapi.json` blocks in `nginx.conf`).
+
+The docs page itself is public. When you click "Try it out" on an endpoint, you will need to provide a valid `X-API-Key` header (either your `ADMIN_API_KEY` or a one-time Polar license key).
+
+Example (after login or with a valid key):
+- Go to https://yourdomain.com/docs
+- Expand an operation (e.g. POST /contracts/analyze)
+- Click "Try it out"
+- In the "X-API-Key" field, paste your key
+- Execute
+
+Note: The "Authorize" button at the top of Swagger UI can also be used to set the API key globally for all operations.
+
 After certs + webhook registration your public URL (`https://yourdomain.com`) is ready for real €2 Polar one-time purchases.

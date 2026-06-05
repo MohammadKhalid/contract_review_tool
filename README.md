@@ -225,6 +225,14 @@ See the detailed plan and exact commands in the session plan file (`.grok/.../pl
 
 The nginx proxy keeps the backend port internal. All browser calls and webhooks go through the single public domain.
 
+### Accessing Swagger UI / API Docs on production
+Once nginx is running (and after TLS if using HTTPS):
+
+- Swagger UI: https://yourdomain.com/docs
+- ReDoc: https://yourdomain.com/redoc
+
+These are proxied to the backend. The page is public to view; authenticated calls (with `X-API-Key`) are supported in the "Try it out" feature. See `nginx/README.md` for details.
+
 ## Usage
 
 ### Web Interface
