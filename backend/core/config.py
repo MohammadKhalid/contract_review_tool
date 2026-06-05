@@ -3,10 +3,11 @@ Application configuration using Pydantic Settings.
 Centralizes all environment variables and application constants.
 """
 
+import json
 import os
-from typing import List, Optional
+from typing import List, Optional, Union, Any
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -40,6 +41,33 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads/contracts"
     MAX_UPLOAD_SIZE_MB: int = 50
     ALLOWED_EXTENSIONS: List[str] = [".pdf"]
+
+    # --- Flexible list parsing for env vars (supports both JSON and comma-separated) ---
+    @field_validator(
+        "CORS_ORIGINS",
+        "CORS_METHODS",
+        "CORS_HEADERS",
+        "ALLOWED_EXTENSIONS",
+        mode="before",
+    )
+    @classmethod
+    def parse_csv_or_json_list(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            try:
+                # Try JSON first: '["https://example.com"]' or ["https://example.com"]
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except (json.JSONDecodeError, TypeError):
+                pass
+            # Fallback to comma-separated: https://example.com,https://other.com
+            return [item.strip() for item in v.split(",") if item.strip()]
+        if isinstance(v, list):
+            return [str(item).strip() for item in v if str(item).strip()]
+        return v
 
     # spaCy
     SPACY_MODEL: str = "de_core_news_sm"

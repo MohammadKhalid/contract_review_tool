@@ -212,7 +212,8 @@ For a public server (VPS) with HTTPS, real Polar payments, and the full "Analyze
 
 See the detailed plan and exact commands in the session plan file (`.grok/.../plan.md` in your local checkout) or follow the high-level steps below.
 
-1. On the server: `git clone`, `cp .env_template .env`, fill real production secrets (especially `POLAR_SERVER=production`, real product ID + token + webhook secret, `NEXT_PUBLIC_API_BASE_URL=https://yourdomain.com`, `CORS_ORIGINS=...`).
+1. On the server: `git clone`, `cp .env_template .env`, fill real production secrets (especially `POLAR_SERVER=production`, real product ID + token + webhook secret, `NEXT_PUBLIC_API_BASE_URL=https://yourdomain.com`, `CORS_ORIGINS=...`). Use JSON or comma form for lists, e.g. `CORS_ORIGINS='["https://yourdomain.com"]'` or `https://yourdomain.com`.
+   The settings parser now flexibly accepts plain strings, JSON, or CSV for list fields.
 2. One-time edits (already committed in this tree after the build-fix work):
    - `backend/Dockerfile` no longer requires host `.docker-cache` dirs at build time.
    - `frontend/Dockerfile` + compose now support build-time `NEXT_PUBLIC_API_BASE_URL`.
