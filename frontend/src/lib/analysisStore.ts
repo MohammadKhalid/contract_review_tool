@@ -154,7 +154,9 @@ export function isPostPurchaseLoading(): boolean {
   return postPurchaseLoading;
 }
 
-export function subscribePostPurchaseLoading(listener: () => void) {
+export function subscribePostPurchaseLoading(listener: () => void): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
