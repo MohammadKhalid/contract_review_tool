@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         orderId: order.id,
         customerId: order.customerId,
         productId: order.productId,
-        amount: order.amount,
+        amount: (order as any).amount ?? order.totalAmount ?? order.netAmount,
       });
     }
 
