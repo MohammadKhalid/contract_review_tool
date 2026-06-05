@@ -1,24 +1,19 @@
 import { validateEvent, WebhookVerificationError } from "@polar-sh/sdk/webhooks";
+import { storeLicenseKey } from "@/lib/polar";
 
-// Simple in-memory store for granted license keys (development only).
-// In production you should persist this in a database.
-const grantedKeys = new Map<string, string>();
-
-export function getLicenseKeyForId(id: string): string | undefined {
-  return grantedKeys.get(id);
-}
-
-export function storeLicenseKey(id: string, key: string) {
-  grantedKeys.set(id, key);
-  // Auto-expire after 1 hour to prevent memory leaks in dev
-  setTimeout(() => grantedKeys.delete(id), 60 * 60 * 1000);
-}
+// Note: getLicenseKeyForId is also provided by @/lib/polar for use by
+// other server routes (e.g. resolve-key). It is deliberately NOT exported
+// from this route handler file.
 
 /**
  * Polar Webhook Handler (manual validation)
  *
  * This is more reliable than the high-level Webhooks() helper in some
  * Next.js + Docker + Turbopack environments.
+ *
+ * NOTE: Only route-handler exports (POST, GET, etc.) are allowed here.
+ * Shared helpers like getLicenseKeyForId / storeLicenseKey live in
+ * src/lib/polar.ts so Next.js type checking for routes doesn't complain.
  */
 export async function POST(request: Request) {
   const body = await request.text();

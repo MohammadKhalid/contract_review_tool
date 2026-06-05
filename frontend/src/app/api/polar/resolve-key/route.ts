@@ -5,8 +5,7 @@
  * without exposing the Polar secret.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { resolveLicenseKeyFromCheckout } from "@/lib/polar";
-import { getLicenseKeyForId } from "../../webhook/polar/route";
+import { resolveLicenseKeyFromCheckout, getLicenseKeyForId } from "@/lib/polar";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

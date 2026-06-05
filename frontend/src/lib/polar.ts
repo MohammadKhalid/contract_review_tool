@@ -2,6 +2,24 @@
 // New code should prefer importing directly from `@/polar` (official guide pattern).
 import { polar } from "@/polar";
 
+// ------------------------------------------------------------------
+// In-memory webhook store (used by the Polar webhook handler and
+// the resolve-key BFF route). This is intentionally simple and
+// dev-only. In production you should persist granted keys in a DB
+// or rely solely on Polar's licenseKeys.list / order lookups.
+// ------------------------------------------------------------------
+const grantedKeys = new Map<string, string>();
+
+export function getLicenseKeyForId(id: string): string | undefined {
+  return grantedKeys.get(id);
+}
+
+export function storeLicenseKey(id: string, key: string) {
+  grantedKeys.set(id, key);
+  // Auto-expire after 1 hour to prevent memory leaks in dev
+  setTimeout(() => grantedKeys.delete(id), 60 * 60 * 1000);
+}
+
 export interface ResolvedLicenseKey {
   licenseKey: string;
   displayKey?: string;
