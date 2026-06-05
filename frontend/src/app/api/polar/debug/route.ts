@@ -6,6 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { polar } from "@/polar";
+import { collectList } from "@/lib/polar";
 
 export async function GET() {
   const debugInfo: any = {
@@ -33,15 +34,16 @@ export async function GET() {
 
   // Test 1: List organizations the token can access
   try {
-    const orgs = await polar.organizations.list({ limit: 10 });
+    const orgsResult = await polar.organizations.list({ limit: 10 });
+    const orgItems = await collectList(orgsResult);
     debugInfo.tests.listOrganizations = {
       success: true,
-      count: orgs.items?.length ?? 0,
-      organizations: orgs.items?.map((org: any) => ({
+      count: orgItems.length,
+      organizations: orgItems.map((org: any) => ({
         id: org.id,
         name: org.name,
         slug: org.slug,
-      })) ?? [],
+      })),
     };
   } catch (e: any) {
     debugInfo.tests.listOrganizations = {
@@ -153,9 +155,10 @@ export async function GET() {
           result = { skipped: true };
       }
 
+      const listItems = await collectList(result);
       debugInfo.tests.additionalEndpointTests[test] = {
         success: true,
-        count: (result as any)?.items?.length ?? (result as any)?.length ?? "unknown",
+        count: listItems.length,
       };
     } catch (e: any) {
       debugInfo.tests.additionalEndpointTests[test] = {

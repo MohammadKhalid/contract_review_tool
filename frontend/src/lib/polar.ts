@@ -20,6 +20,51 @@ export function storeLicenseKey(id: string, key: string) {
   setTimeout(() => grantedKeys.delete(id), 60 * 60 * 1000);
 }
 
+/**
+ * Helper to consume Polar SDK PageIterator (or legacy array/items shapes)
+ * into a plain array. Used by debug/test endpoints.
+ */
+export async function collectList<T = any>(result: any): Promise<T[]> {
+  const items: T[] = [];
+
+  if (!result) return items;
+
+  // Direct array (some older calls or mocks)
+  if (Array.isArray(result)) {
+    return result;
+  }
+
+  // Already has .items (legacy shape)
+  if (Array.isArray(result.items)) {
+    return result.items;
+  }
+
+  // Modern PageIterator – async iterable of pages
+  if (typeof result[Symbol.asyncIterator] === "function" || result?.next) {
+    try {
+      for await (const page of result) {
+        const pageItems =
+          page?.result?.items ||
+          page?.items ||
+          (Array.isArray(page) ? page : []);
+        if (Array.isArray(pageItems)) {
+          items.push(...pageItems);
+        }
+      }
+    } catch (e) {
+      console.log("[Polar] collectList iteration failed", e);
+    }
+    return items;
+  }
+
+  // Fallback: try common shapes
+  if (Array.isArray(result?.result?.items)) {
+    return result.result.items;
+  }
+
+  return items;
+}
+
 export interface ResolvedLicenseKey {
   licenseKey: string;
   displayKey?: string;

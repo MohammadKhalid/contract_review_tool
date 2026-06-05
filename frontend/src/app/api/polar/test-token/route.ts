@@ -7,6 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { getPolarClient, resetPolarClient } from "@/polar";
+import { collectList } from "@/lib/polar";
 
 export async function POST() {
   const server = process.env.POLAR_SERVER || "sandbox";
@@ -90,7 +91,8 @@ export async function POST() {
     }
 
     // Organizations list
-    const orgs = await polarClient.organizations.list({ limit: 5 });
+    const orgsResult = await polarClient.organizations.list({ limit: 5 });
+    const orgItems = await collectList(orgsResult);
 
     // Optional product lookup
     let productInfo = null;
@@ -115,11 +117,11 @@ export async function POST() {
     result.sdkCall = {
       success: true,
       actualSdkBaseUrl,
-      organizations: orgs.items?.map((o: any) => ({
+      organizations: orgItems.map((o: any) => ({
         id: o.id,
         name: o.name,
         slug: o.slug,
-      })) || [],
+      })),
       product: productInfo,
     };
   } catch (err: any) {
