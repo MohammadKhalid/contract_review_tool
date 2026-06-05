@@ -14,6 +14,10 @@ RUN npm install --legacy-peer-deps
 COPY tsconfig.json next.config.mjs tailwind.config.ts postcss.config.mjs ./
 COPY src/ ./src/
 COPY messages/ ./messages/
+# public/ must exist in the build context (git does not check out empty directories).
+# We keep a frontend/public/.gitkeep (tracked by git) + frontend/.dockerignore
+# (to hide the marker from the image). This prevents " /public: not found"
+# on fresh clones, exactly like the previous backend .docker-cache bind issue.
 COPY public/ ./public/
 
 # NEXT_PUBLIC_API_BASE_URL must be supplied as a build arg (see docker-compose.yml

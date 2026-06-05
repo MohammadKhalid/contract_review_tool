@@ -1,0 +1,12 @@
+# This file ensures the public/ directory is tracked by git.
+# Git does not track empty directories, but the frontend Dockerfile does
+# `COPY public/ ./public/`, which requires the directory to exist in the
+# Docker build context.
+#
+# Without this (or some other file), `docker compose --profile prod build`
+# (or any build with context=./frontend) will fail on fresh clones with:
+#   COPY public/ ./public/
+#   failed to calculate checksum of ref ...: "/public": not found
+#
+# You can safely delete this file once you add real static assets
+# (favicon.ico, images, robots.txt, etc.) to this directory.

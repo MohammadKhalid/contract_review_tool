@@ -1,0 +1,15 @@
+# Docker ignore for the frontend build context (context: ./frontend in compose).
+# This is separate from the root .dockerignore.
+
+# Exclude the git placeholder we use to keep public/ tracked in the repo.
+# Real static files you add to public/ (favicons, images, etc.) will still be copied.
+public/.gitkeep
+
+# Common things (in case root .dockerignore isn't inherited for this sub-context build)
+node_modules/
+.next/
+out/
+build/
+*.log
+.env*
+.env.local
