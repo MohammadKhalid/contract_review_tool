@@ -5,10 +5,34 @@ Centralizes all environment variables and application constants.
 
 import json
 import os
-from typing import List, Optional, Union, Any
+from typing import Annotated, Any, List, Optional
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BeforeValidator, Field, model_validator
 from pydantic_settings import BaseSettings
+
+
+def _parse_list(v: Any) -> List[str]:
+    """Parse env var into list of strings.
+    Supports:
+    - JSON: '["https://example.com"]' or ["https://example.com"]
+    - Comma-separated: https://example.com,https://other.com
+    - Single value: https://example.com  -> ["https://example.com"]
+    """
+    if isinstance(v, str):
+        v = v.strip()
+        if not v:
+            return []
+        try:
+            parsed = json.loads(v)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        except (json.JSONDecodeError, TypeError):
+            pass
+        # fallback to comma sep
+        return [item.strip() for item in v.split(",") if item.strip()]
+    if isinstance(v, list):
+        return [str(item).strip() for item in v if str(item).strip()]
+    return []
 
 
 class Settings(BaseSettings):
@@ -32,42 +56,15 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
 
     # CORS
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: Annotated[List[str], BeforeValidator(lambda v: _parse_list(v))] = ["*"]
     CORS_CREDENTIALS: bool = True
-    CORS_METHODS: List[str] = ["*"]
-    CORS_HEADERS: List[str] = ["*"]
+    CORS_METHODS: Annotated[List[str], BeforeValidator(lambda v: _parse_list(v))] = ["*"]
+    CORS_HEADERS: Annotated[List[str], BeforeValidator(lambda v: _parse_list(v))] = ["*"]
 
     # Upload
     UPLOAD_DIR: str = "uploads/contracts"
     MAX_UPLOAD_SIZE_MB: int = 50
-    ALLOWED_EXTENSIONS: List[str] = [".pdf"]
-
-    # --- Flexible list parsing for env vars (supports both JSON and comma-separated) ---
-    @field_validator(
-        "CORS_ORIGINS",
-        "CORS_METHODS",
-        "CORS_HEADERS",
-        "ALLOWED_EXTENSIONS",
-        mode="before",
-    )
-    @classmethod
-    def parse_csv_or_json_list(cls, v: Union[str, List[str]]) -> List[str]:
-        if isinstance(v, str):
-            v = v.strip()
-            if not v:
-                return []
-            try:
-                # Try JSON first: '["https://example.com"]' or ["https://example.com"]
-                parsed = json.loads(v)
-                if isinstance(parsed, list):
-                    return [str(item).strip() for item in parsed if str(item).strip()]
-            except (json.JSONDecodeError, TypeError):
-                pass
-            # Fallback to comma-separated: https://example.com,https://other.com
-            return [item.strip() for item in v.split(",") if item.strip()]
-        if isinstance(v, list):
-            return [str(item).strip() for item in v if str(item).strip()]
-        return v
+    ALLOWED_EXTENSIONS: Annotated[List[str], BeforeValidator(lambda v: _parse_list(v))] = [".pdf"]
 
     # spaCy
     SPACY_MODEL: str = "de_core_news_sm"
