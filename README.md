@@ -207,6 +207,24 @@ docker compose --profile dev up frontend-dev
   - Frontend UI changes
 - You can mix profiles if needed (e.g. keep the main `backend` running while using `frontend-dev`).
 
+## Production Deployment
+For a public server (VPS) with HTTPS, real Polar payments, and the full "Analyze for €2" flow:
+
+See the detailed plan and exact commands in the session plan file (`.grok/.../plan.md` in your local checkout) or follow the high-level steps below.
+
+1. On the server: `git clone`, `cp .env_template .env`, fill real production secrets (especially `POLAR_SERVER=production`, real product ID + token + webhook secret, `NEXT_PUBLIC_API_BASE_URL=https://yourdomain.com`, `CORS_ORIGINS=...`).
+2. One-time edits (already committed in this tree after the build-fix work):
+   - `backend/Dockerfile` no longer requires host `.docker-cache` dirs at build time.
+   - `frontend/Dockerfile` + compose now support build-time `NEXT_PUBLIC_API_BASE_URL`.
+   - `nginx/` folder + service added for the reverse proxy.
+3. `docker compose --profile prod up -d --build` (no manual `mkdir .docker-cache` needed).
+4. On first start the backend entrypoint will download the ML models into the named volumes (visible in logs; only once).
+5. Obtain Let's Encrypt certs with certbot, place in `nginx/certs/`, enable the 443 block in `nginx/nginx.conf`, restart nginx.
+6. Register `https://yourdomain.com/api/webhook/polar` in the Polar production dashboard and seed the KB with your `ADMIN_API_KEY` via the public URL.
+7. Visit https://yourdomain.com and test the complete Polar one-time purchase + analysis flow ("Analyze for €2", direct results page with loader, New Analysis reset).
+
+The nginx proxy keeps the backend port internal. All browser calls and webhooks go through the single public domain.
+
 ## Usage
 
 ### Web Interface

@@ -15,8 +15,8 @@ services:
 
   backend:
      build: ./backend
-     ports:
-       - "5001:5001"
+     # No ports published for prod — only the nginx reverse proxy exposes 80/443 publicly.
+     # All traffic to /contracts/* etc. is routed internally by nginx.
      volumes:
        - ./backend:/app
        # Model caches use named volumes in the prod-like profile.
@@ -84,12 +84,18 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:5001
-      # Polar credentials (required for the buy flow)
+      # NEXT_PUBLIC_API_BASE_URL is now supplied at build time via the args above
+      # so the value is baked into the client JS bundle (see frontend/Dockerfile
+      # and src/lib/api.ts). The value below is only for any server-side code
+      # that might read process.env at runtime.
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5001}
+      # Polar credentials (required for the buy flow / BFF routes at runtime)
       - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN}
       - POLAR_ORGANIZATION_ID=${POLAR_ORGANIZATION_ID}
       - POLAR_SERVER=${POLAR_SERVER:-sandbox}
@@ -100,6 +106,25 @@ services:
       - backend
     profiles:
       - prod   # Use: docker compose --profile prod up   (for production-like stack)
+
+  # Production reverse proxy (nginx). Only public entrypoint (ports 80/443).
+  # Routes the frontend (incl. all Next.js BFF /api routes + /api/webhook/polar)
+  # and the backend APIs. TLS certs (if present) are mounted from ./nginx/certs.
+  # See nginx/README.md for certbot steps.
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - frontend
+      - backend
+    profiles:
+      - prod
 
   # Development frontend with hot reload
   # Part of the dev profile. Start with: docker compose --profile dev up db backend-dev frontend-dev

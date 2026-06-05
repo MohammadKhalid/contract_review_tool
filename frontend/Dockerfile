@@ -16,6 +16,13 @@ COPY src/ ./src/
 COPY messages/ ./messages/
 COPY public/ ./public/
 
+# NEXT_PUBLIC_API_BASE_URL must be supplied as a build arg (see docker-compose.yml
+# prod frontend service) and set as ENV so that it is baked into the client bundle
+# at `npm run build` time (used by frontend/src/lib/api.ts for browser calls to
+# /contracts/analyze etc.). Runtime environment values do not affect the build.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
 # Build the application
 RUN npm run build
 
