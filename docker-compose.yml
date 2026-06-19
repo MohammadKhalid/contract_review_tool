@@ -12,12 +12,16 @@ services:
       - postgres
       - -c
       - hba_file=/etc/postgresql/pg_hba.conf
+      - -c
+      - ssl=off
     # Port is published so pgAdmin can connect via SSH tunnel from outside.
     # (For stricter security you can comment this out and forward directly to the container.)
     ports:
       - "5432:5432"  # published for external tools like pgAdmin via SSH tunnel
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      # Use TCP (-h localhost) + password so peer auth is not used.
+      # This avoids "Peer authentication failed for user ..." when the exec shell runs as root.
+      test: ["CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
