@@ -5,8 +5,14 @@ services:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Mount a custom pg_hba.conf that allows non-SSL Postgres connections.
+      # We rely on the SSH tunnel (in pgAdmin) for encryption instead of Postgres SSL.
+      # This prevents the "pg_hba.conf rejects connection ... no encryption" error.
+      - ./db/pg_hba.conf:/var/lib/postgresql/data/pg_hba.conf:ro
+    # Port is published so pgAdmin can connect via SSH tunnel from outside.
+    # (For stricter security you can comment this out and forward directly to the container.)
     ports:
-      - "5432:5432"
+      - "5432:5432"  # published for external tools like pgAdmin via SSH tunnel
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s

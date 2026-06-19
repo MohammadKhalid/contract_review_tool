@@ -14,21 +14,24 @@ from pydantic_settings import BaseSettings
 def _parse_list(v: Any) -> List[str]:
     """Parse env var into list of strings.
     Supports:
-    - JSON: '["https://example.com"]' or ["https://example.com"]
+    - JSON array: '["https://example.com"]'
     - Comma-separated: https://example.com,https://other.com
     - Single value: https://example.com  -> ["https://example.com"]
+    - "*" or empty handled gracefully
     """
     if isinstance(v, str):
         v = v.strip()
-        if not v:
+        if not v or v == '""' or v == "''":
             return []
-        try:
-            parsed = json.loads(v)
-            if isinstance(parsed, list):
-                return [str(item).strip() for item in parsed if str(item).strip()]
-        except (json.JSONDecodeError, TypeError):
-            pass
-        # fallback to comma sep
+        # Try JSON first (recommended and reliable)
+        if v.startswith("[") or v.startswith("{"):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # Fallback: comma separated or single value
         return [item.strip() for item in v.split(",") if item.strip()]
     if isinstance(v, list):
         return [str(item).strip() for item in v if str(item).strip()]
