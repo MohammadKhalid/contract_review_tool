@@ -14,6 +14,9 @@ services:
       - hba_file=/etc/postgresql/pg_hba.conf
       - -c
       - ssl=off
+      # Listen on all interfaces (already default, but explicit)
+      - -c
+      - listen_addresses=*
     # Port is published so pgAdmin can connect via SSH tunnel from outside.
     # (For stricter security you can comment this out and forward directly to the container.)
     ports:

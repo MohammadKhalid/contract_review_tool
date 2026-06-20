@@ -139,7 +139,7 @@ This project uses **Alembic** for schema management (recommended for production 
 docker compose exec backend alembic revision --autogenerate -m "Add notes column to contracts"
 
 # Apply pending migrations manually
-docker compose exec backend alembic upgrade head
+docker compose --profile prod exec backend alembic upgrade head
 
 # Check current migration state
 docker compose exec backend alembic current

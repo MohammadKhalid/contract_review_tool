@@ -1,6 +1,32 @@
 import type { ContractAnalysisResponse, ErrorResponse } from '@/types/contract';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001';
+/**
+ * Resolve the backend base URL for API calls.
+ *
+ * In production the frontend and /contracts/* are served on the same host via
+ * nginx. Using a relative base (empty string) keeps requests same-origin and
+ * avoids a CORS preflight OPTIONS before the actual POST.
+ *
+ * In local dev the Next.js app (port 3000) and backend (port 5001) are different
+ * origins, so we call the backend URL directly (CORS is enabled there).
+ */
+function resolveApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  if (typeof window === 'undefined') {
+    return configured || 'http://localhost:5001';
+  }
+
+  const isLocalDev =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+
+  if (isLocalDev) {
+    return configured || 'http://localhost:5001';
+  }
+
+  return '';
+}
 
 export class ApiError extends Error {
   statusCode?: number;
@@ -31,7 +57,7 @@ export async function analyzeContract(
     headers['X-API-Key'] = apiKey;
   }
 
-  const response = await fetch(`${API_BASE_URL}/contracts/analyze?lang=${lang}`, {
+  const response = await fetch(`${resolveApiBaseUrl()}/contracts/analyze?lang=${lang}`, {
     method: 'POST',
     body: formData,
     headers,
@@ -60,7 +86,7 @@ export async function analyzeContract(
 }
 
 export function getApiBaseUrl(): string {
-  return API_BASE_URL;
+  return resolveApiBaseUrl();
 }
 
 /** Helper to detect paywall errors from the backend */
