@@ -10,6 +10,7 @@ WORKDIR /app
 # Install system dependencies for spaCy and OCR
 RUN apt-get update && apt-get install -y \
     build-essential \
+    curl \
     tesseract-ocr \
     tesseract-ocr-deu \
     libtesseract-dev \

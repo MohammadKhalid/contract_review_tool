@@ -50,11 +50,13 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 30s
+      # Use Python (always present in the image). First boot can take several
+      # minutes while ML models download in docker-entrypoint.sh.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health', timeout=5)\""]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 10
+      start_period: 600s
     profiles:
       - prod   # Use: docker compose --profile prod up   (for production-like stack)
 
