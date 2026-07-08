@@ -43,39 +43,33 @@ def has_text_content(pdf_path):
 def extract_text_with_ocr(pdf_path):
     """Extract text from scanned PDF using Tesseract OCR with German post-correction.
 
-    Renders pages one at a time (via first/last_page) to keep peak memory low
-    even for long scanned contracts. Explicitly closes every PIL image to avoid
-    memory leaks that can cause the process to become unresponsive after many
-    OCR jobs over days.
+    Loads all pages in a single convert_from_path call for speed (poppler
+    parsing + rendering is expensive to repeat per page). Images are closed
+    immediately after OCR to release memory promptly (prevents the "stuck after
+    days" accumulation of PIL buffers from the old no-close version).
     """
     extracted_text = ""
+    images = []
     try:
-        # Use fitz (already a dependency) for cheap page count. Avoids loading
-        # the entire document raster at once.
-        doc = fitz.open(pdf_path)
-        num_pages = len(doc)
-        doc.close()
+        # Single call to convert is much faster than per-page calls
+        # (avoids repeated PDF parsing / pdftoppm process spawning).
+        images = convert_from_path(
+            pdf_path,
+            dpi=150,  # tradeoff: lower = faster OCR but slightly less accuracy
+        )
+        num_pages = len(images)
+        logger.info("Starting OCR for %d page(s) (dpi=150, tesseract deu) - single convert for speed", num_pages)
 
-        logger.info("Starting OCR for %d page(s) (one page at a time, dpi=150, tesseract deu)", num_pages)
-
-        for page_num in range(1, num_pages + 1):
-            # Render *only* the current page. This bounds memory to ~1 page worth
-            # of image data regardless of contract length.
-            page_images = convert_from_path(
-                pdf_path,
-                first_page=page_num,
-                last_page=page_num,
-                dpi=150,  # Good tradeoff for German contract OCR accuracy vs RAM/CPU
-            )
-            for image in page_images:
-                try:
+        for page_num, image in enumerate(images, 1):
+            try:
+                # Log only every few pages to reduce logging overhead on long docs
+                if page_num == 1 or page_num == num_pages or page_num % 5 == 0:
                     logger.info("OCR page %d/%d starting...", page_num, num_pages)
-                    text = pytesseract.image_to_string(image, lang="deu")
-                    extracted_text += f"\n--- Page {page_num} ---\n{text}"
-                    logger.info("OCR page %d/%d done (%d chars extracted)", page_num, num_pages, len(text))
-                finally:
-                    # Critical: release pixel buffers immediately.
-                    image.close()
+                text = pytesseract.image_to_string(image, lang="deu")
+                extracted_text += f"\n--- Page {page_num} ---\n{text}"
+            finally:
+                # Close immediately after use - this is the key for memory hygiene
+                image.close()
 
         # Apply German post-correction to fix common OCR errors
         corrected_text = correct_german_ocr(extracted_text.strip())
@@ -84,6 +78,14 @@ def extract_text_with_ocr(pdf_path):
     except Exception as e:
         logger.error("Error during OCR processing: %s", e)
         return ""
+    finally:
+        # Safety net in case of early exit
+        for image in images:
+            try:
+                if image:
+                    image.close()
+            except Exception:
+                pass
 
 
 def extract_text_with_pymupdf(pdf_path):

@@ -661,9 +661,8 @@ async def analyze_contract(
     # blocked. This prevents the whole app from appearing stuck during long OCR
     # jobs (common for scanned contracts) and allows other requests to make progress.
     logger.info(
-        "File saved successfully. Starting text extraction now (for large or scanned PDFs "
-        "this can take 30s–several minutes depending on #pages and CPU; progress logs will appear). "
-        "Other requests (e.g. health) can still be served in the meantime."
+        "File saved successfully. Starting text extraction (OCR if needed). "
+        "For large scanned PDFs this is the slow part; we now log progress."
     )
     overall_start = time.time()
 
