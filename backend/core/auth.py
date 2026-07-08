@@ -170,17 +170,23 @@ async def get_current_principal(
             "Server misconfiguration: missing Polar organization ID"
         )
 
+    logger.info(
+        "Polar license validation attempt: key_prefix=%s org=%s increment=%s",
+        (token[:4] + "..." + token[-4:]) if token and len(token) > 8 else "short/invalid",
+        settings.POLAR_ORGANIZATION_ID,
+        increment_usage,
+    )
+
     try:
         # Validate using the organization-level License Keys API (works with Organization Access Token).
         # Using customer_portal was causing validation failures with org tokens.
         # Use the modern SDK style from https://github.com/polarsource/polar-python
-        # Pass parameters directly (the previous `request={...}` wrapper was causing
-        # the key not to be recognized by Polar, resulting in "ResourceNotFound / expired"
-        # even for perfectly valid fresh keys).
         validation = polar.license_keys.validate(
-            key=token,
-            organization_id=settings.POLAR_ORGANIZATION_ID,
-            increment_usage=increment_usage if increment_usage > 0 else None,
+            request={
+                "key": token,
+                "organization_id": settings.POLAR_ORGANIZATION_ID,
+                "increment_usage": increment_usage if increment_usage > 0 else None,
+            }
         )
 
         # Check status

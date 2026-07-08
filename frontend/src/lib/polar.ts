@@ -168,15 +168,24 @@ export async function resolveLicenseKeyFromCheckout(
           );
 
           if (matchingKeys.length > 0) {
-            const key = matchingKeys[0];
-            console.log("[Polar] ✅ Found license key via org-level licenseKeys.list");
+            // Sort newest first and prefer a granted/active key that isn't expired
+            const sorted = [...matchingKeys].sort((a: any, b: any) => {
+              const ta = new Date(a.created_at || a.createdAt || a.last_validated_at || 0).getTime();
+              const tb = new Date(b.created_at || b.createdAt || b.last_validated_at || 0).getTime();
+              return tb - ta;
+            });
+            const best = sorted.find((k: any) =>
+              (k.status === 'granted' || k.status === 'active' || !k.status) &&
+              (!k.expires_at || new Date(k.expires_at) > new Date())
+            ) || sorted[0];
+            console.log("[Polar] ✅ Found license key via org-level licenseKeys.list (picked most recent suitable)");
             return {
-              licenseKey: key.key,
-              displayKey: key.displayKey,
-              expiresAt: key.expiresAt,
-              usage: key.usage,
-              limitUsage: key.limitUsage,
-              status: key.status,
+              licenseKey: best.key,
+              displayKey: best.displayKey,
+              expiresAt: best.expiresAt,
+              usage: best.usage,
+              limitUsage: best.limitUsage,
+              status: best.status,
             };
           } else {
             console.log(`[Polar] Org-level licenseKeys.list returned ${allKeys.length} keys total, 0 matched customer ${customerId}`);
@@ -209,21 +218,23 @@ export async function resolveLicenseKeyFromCheckout(
             } catch {}
           }
 
-          // Look for any license keys on the recent orders
-          for (const order of orders) {
-            const orderLicenseKeys = order?.licenseKeys || order?.license_keys;
-            if (Array.isArray(orderLicenseKeys) && orderLicenseKeys.length > 0) {
-              const key = orderLicenseKeys[0];
-              console.log("[Polar] ✅ Found license key attached to order", order.id);
-              return {
-                licenseKey: key.key || key,
-                displayKey: key.displayKey,
-                expiresAt: key.expiresAt,
-                usage: key.usage,
-                limitUsage: key.limitUsage,
-                status: key.status,
-              };
-            }
+          // Look for any license keys on the recent orders (prefer latest order with good key)
+          const orderWithKeys = orders.find((o: any) => {
+            const ks = o?.licenseKeys || o?.license_keys;
+            return Array.isArray(ks) && ks.length > 0;
+          });
+          if (orderWithKeys) {
+            const orderLicenseKeys = orderWithKeys?.licenseKeys || orderWithKeys?.license_keys;
+            const key = orderLicenseKeys[0];
+            console.log("[Polar] ✅ Found license key attached to order", orderWithKeys.id);
+            return {
+              licenseKey: key.key || key,
+              displayKey: key.displayKey,
+              expiresAt: key.expiresAt,
+              usage: key.usage,
+              limitUsage: key.limitUsage,
+              status: key.status,
+            };
           }
         } catch (e: any) {
           console.log("[Polar] orders.list attempt failed:", e?.message || e);
