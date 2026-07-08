@@ -47,18 +47,19 @@ class TestPolarValidationMocked:
         mock_validation.status = "granted"
         mock_validation.limit_usage = None
         mock_validation.usage = 0
-        mock_polar.customer_portal.license_keys.validate.return_value = mock_validation
+        mock_polar.license_keys.validate.return_value = mock_validation
         mock_get_client.return_value = mock_polar
 
         # We can't directly invoke the dep easily without a full request context.
         # Instead we assert that the client would be called with correct args
         # in a real scenario (integration + manual tests cover the rest).
+        # Note: production code now calls polar.license_keys.validate directly (not customer_portal).
         assert mock_get_client is not None
 
     @patch("core.auth.get_polar_client")
     def test_invalid_license_key_raises_unauthorized(self, mock_get_client):
         mock_polar = MagicMock()
-        mock_polar.customer_portal.license_keys.validate.side_effect = Exception("license not found")
+        mock_polar.license_keys.validate.side_effect = Exception("license not found")
         mock_get_client.return_value = mock_polar
 
         # Real error mapping happens inside the dep; this confirms mock wiring

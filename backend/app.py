@@ -9,8 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.dependencies import get_db
+from core.exceptions import AppException
 from core.logging import setup_logging, get_logger
 from database.connection import create_tables
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from routers.legal_kb import router as legal_kb_router
 from routers.contracts import router as contracts_router
 
@@ -72,6 +75,15 @@ async def health_check():
         "app": settings.APP_TITLE,
         "version": settings.APP_VERSION,
     }
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """Return proper HTTP status for our custom exceptions (including auth errors from dependencies)."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message},
+    )
 
 
 # Include routers
