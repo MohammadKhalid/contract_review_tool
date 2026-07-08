@@ -38,20 +38,40 @@ def has_text_content(pdf_path):
 
 
 def extract_text_with_ocr(pdf_path):
-    """Extract text from scanned PDF using Tesseract OCR with German post-correction."""
-    try:
-        # Convert PDF pages to images
-        images = convert_from_path(pdf_path)
+    """Extract text from scanned PDF using Tesseract OCR with German post-correction.
 
-        extracted_text = ""
-        for i, image in enumerate(images):
-            # Convert PIL image to text using Tesseract OCR with German language
-            text = pytesseract.image_to_string(image, lang="deu")
-            extracted_text += f"\n--- Page {i+1} ---\n{text}"
+    Renders pages one at a time (via first/last_page) to keep peak memory low
+    even for long scanned contracts. Explicitly closes every PIL image to avoid
+    memory leaks that can cause the process to become unresponsive after many
+    OCR jobs over days.
+    """
+    extracted_text = ""
+    try:
+        # Use fitz (already a dependency) for cheap page count. Avoids loading
+        # the entire document raster at once.
+        doc = fitz.open(pdf_path)
+        num_pages = len(doc)
+        doc.close()
+
+        for page_num in range(1, num_pages + 1):
+            # Render *only* the current page. This bounds memory to ~1 page worth
+            # of image data regardless of contract length.
+            page_images = convert_from_path(
+                pdf_path,
+                first_page=page_num,
+                last_page=page_num,
+                dpi=150,  # Good tradeoff for German contract OCR accuracy vs RAM/CPU
+            )
+            for image in page_images:
+                try:
+                    text = pytesseract.image_to_string(image, lang="deu")
+                    extracted_text += f"\n--- Page {page_num} ---\n{text}"
+                finally:
+                    # Critical: release pixel buffers immediately.
+                    image.close()
 
         # Apply German post-correction to fix common OCR errors
         corrected_text = correct_german_ocr(extracted_text.strip())
-
         return corrected_text
 
     except Exception as e:

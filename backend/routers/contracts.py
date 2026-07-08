@@ -5,8 +5,9 @@ Thin router that delegates business logic to the contract service.
 
 import asyncio
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 import spacy
 
@@ -18,6 +19,21 @@ from schemas.contract import ContractAnalysisResponse
 from services.contract_service import analyze_contract
 
 logger = get_logger(__name__)
+
+
+# Proper async dependency wrapper so that FastAPI can await get_current_principal
+# (which is async) and pass the increment_usage argument. The previous lambda
+# created an un-awaited coroutine, causing RuntimeWarning + potential issues.
+async def get_current_principal_for_analyze(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> Principal:
+    return await get_current_principal(
+        x_api_key=x_api_key,
+        authorization=authorization,
+        increment_usage=1,
+    )
+
 
 router = APIRouter(prefix="/contracts")
 
@@ -35,7 +51,7 @@ async def analyze_contract_endpoint(
     lang: str = Query("de", description="Language for issue descriptions ('en' or 'de')"),
     db: Session = Depends(get_db),
     nlp: spacy.Language = Depends(get_nlp_model),
-    principal: Principal = Depends(lambda: get_current_principal(increment_usage=1)),
+    principal: Principal = Depends(get_current_principal_for_analyze),
 ):
     """
     Upload and analyze a contract PDF.

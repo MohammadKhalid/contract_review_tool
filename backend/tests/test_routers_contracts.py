@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from core.dependencies import get_db, get_nlp_model
 from core.auth import get_current_principal
-from routers.contracts import router as contracts_router
+from routers.contracts import router as contracts_router, get_current_principal_for_analyze
 from schemas.contract import (
     ContractAnalysisResponse,
     ContractAnalysisResult,
@@ -41,6 +41,7 @@ def create_test_app(mock_db, mock_nlp):
     # This keeps test churn minimal while still exercising the auth dependency.
     test_admin = Principal(role="admin", token="test-admin-key", is_admin=True)
     app.dependency_overrides[get_current_principal] = lambda: test_admin
+    app.dependency_overrides[get_current_principal_for_analyze] = lambda: test_admin
 
     return app
 

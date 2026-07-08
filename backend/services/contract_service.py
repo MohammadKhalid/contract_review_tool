@@ -655,15 +655,25 @@ async def analyze_contract(
     file_path, file_size = save_upload_file(file_obj, filename)
 
     # 3. Extract text + NLP analysis + issue detection (timed phases)
+    # Offload all the blocking work (PDF rasterization via poppler, Tesseract OCR
+    # subprocesses, spaCy CPU work) to a thread so the uvicorn event loop is not
+    # blocked. This prevents the whole app from appearing stuck during long OCR
+    # jobs (common for scanned contracts) and allows other requests to make progress.
     overall_start = time.time()
 
     with timed_phase("extract_text"):
-        extracted_text, processing_method = extract_text_from_pdf(file_path)
+        extracted_text, processing_method = await asyncio.to_thread(
+            extract_text_from_pdf, file_path
+        )
 
     with timed_phase("nlp_analysis"):
-        doc = nlp(extracted_text)
-        word_count, sentence_count, found_key_terms, entities = analyze_text_with_spacy(
-            doc
+        def _run_nlp_and_stats(text: str):
+            d = nlp(text)
+            wc, sc, terms, ents = analyze_text_with_spacy(d)
+            return wc, sc, terms, ents, d
+
+        word_count, sentence_count, found_key_terms, entities, doc = await asyncio.to_thread(
+            _run_nlp_and_stats, extracted_text
         )
 
     # Normalize language
