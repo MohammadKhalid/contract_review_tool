@@ -12,7 +12,10 @@ import os
 from pdf2image import convert_from_path
 import tempfile
 
+from core.logging import get_logger
 from ocr_postprocess import correct_german_ocr
+
+logger = get_logger(__name__)
 
 
 def has_text_content(pdf_path):
@@ -33,7 +36,7 @@ def has_text_content(pdf_path):
         doc.close()
         return False
     except Exception as e:
-        print(f"Error checking PDF text content: {e}")
+        logger.error("Error checking PDF text content: %s", e)
         return False
 
 
@@ -53,6 +56,8 @@ def extract_text_with_ocr(pdf_path):
         num_pages = len(doc)
         doc.close()
 
+        logger.info("Starting OCR for %d page(s) (one page at a time, dpi=150, tesseract deu)", num_pages)
+
         for page_num in range(1, num_pages + 1):
             # Render *only* the current page. This bounds memory to ~1 page worth
             # of image data regardless of contract length.
@@ -64,8 +69,10 @@ def extract_text_with_ocr(pdf_path):
             )
             for image in page_images:
                 try:
+                    logger.info("OCR page %d/%d starting...", page_num, num_pages)
                     text = pytesseract.image_to_string(image, lang="deu")
                     extracted_text += f"\n--- Page {page_num} ---\n{text}"
+                    logger.info("OCR page %d/%d done (%d chars extracted)", page_num, num_pages, len(text))
                 finally:
                     # Critical: release pixel buffers immediately.
                     image.close()
@@ -75,7 +82,7 @@ def extract_text_with_ocr(pdf_path):
         return corrected_text
 
     except Exception as e:
-        print(f"Error during OCR processing: {e}")
+        logger.error("Error during OCR processing: %s", e)
         return ""
 
 
@@ -94,7 +101,7 @@ def extract_text_with_pymupdf(pdf_path):
 
         return extracted_text.strip()
     except Exception as e:
-        print(f"Error extracting text with PyMuPDF: {e}")
+        logger.error("Error extracting text with PyMuPDF: %s", e)
         return ""
 
 

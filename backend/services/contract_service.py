@@ -283,6 +283,7 @@ def extract_text_from_pdf(file_path: str) -> Tuple[str, str]:
         Tuple of (extracted_text, processing_method)
     """
     start_time = time.time()
+    logger.info("process_pdf_file starting for %s", file_path)
     extracted_text, processing_method = process_pdf_file(file_path)
     processing_time = time.time() - start_time
 
@@ -659,6 +660,11 @@ async def analyze_contract(
     # subprocesses, spaCy CPU work) to a thread so the uvicorn event loop is not
     # blocked. This prevents the whole app from appearing stuck during long OCR
     # jobs (common for scanned contracts) and allows other requests to make progress.
+    logger.info(
+        "File saved successfully. Starting text extraction now (for large or scanned PDFs "
+        "this can take 30s–several minutes depending on #pages and CPU; progress logs will appear). "
+        "Other requests (e.g. health) can still be served in the meantime."
+    )
     overall_start = time.time()
 
     with timed_phase("extract_text"):
