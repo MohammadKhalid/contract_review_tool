@@ -29,6 +29,7 @@ os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 
 def has_text_content(pdf_path):
     """Check if PDF has extractable text content using PyMuPDF."""
+    doc = None
     try:
         doc = fitz.open(pdf_path)
 
@@ -39,14 +40,15 @@ def has_text_content(pdf_path):
 
             # If we find substantial text content, assume it's text-based
             if len(text) > 100:  # More than 100 characters
-                doc.close()
                 return True
 
-        doc.close()
         return False
     except Exception as e:
         logger.error("Error checking PDF text content: %s", e)
         return False
+    finally:
+        if doc is not None:
+            doc.close()
 
 
 def _render_all_pages(pdf_path: str) -> list[Image.Image]:
@@ -57,20 +59,27 @@ def _render_all_pages(pdf_path: str) -> list[Image.Image]:
     try:
         for page in doc:
             pix = page.get_pixmap(matrix=matrix, alpha=False)
-            images.append(
-                Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            )
+            try:
+                images.append(
+                    Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+                )
+            finally:
+                # Release pixmap pixel buffer before rendering the next page.
+                pix = None
     finally:
         doc.close()
     return images
 
 
 def _ocr_page(page_num: int, image: Image.Image) -> tuple[int, str]:
+    gray = None
     try:
         gray = image.convert("L")
         text = pytesseract.image_to_string(gray, lang="deu", config=_TESSERACT_CONFIG)
         return page_num, text
     finally:
+        if gray is not None:
+            gray.close()
         image.close()
 
 
@@ -133,6 +142,7 @@ def extract_text_with_ocr(pdf_path):
                     image.close()
             except Exception:
                 pass
+        images.clear()
 
 
 def extract_text_with_pymupdf(pdf_path):
@@ -140,18 +150,21 @@ def extract_text_with_pymupdf(pdf_path):
 
     Note: Post-correction is NOT applied here since digital PDFs already have
     clean text. Correction is only needed for scanned PDF OCR output."""
+    doc = None
     try:
         doc = fitz.open(pdf_path)
         extracted_text = ""
         for i, page in enumerate(doc):
             text = page.get_text()
             extracted_text += f"\n--- Page {i+1} ---\n{text}"
-        doc.close()
 
         return extracted_text.strip()
     except Exception as e:
         logger.error("Error extracting text with PyMuPDF: %s", e)
         return ""
+    finally:
+        if doc is not None:
+            doc.close()
 
 
 def process_pdf_file(file_path):
