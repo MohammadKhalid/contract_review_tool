@@ -4,9 +4,13 @@ Uses PyMuPDF (fitz) for digital PDFs and Tesseract for scanned PDFs,
 with German post-correction for improved OCR accuracy.
 """
 
-import pytesseract
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import fitz  # PyMuPDF
-from pdf2image import convert_from_path
+import pytesseract
+from PIL import Image
 
 from core.logging import get_logger
 from ocr_postprocess import correct_german_ocr
@@ -15,6 +19,12 @@ logger = get_logger(__name__)
 
 # DPI tradeoff for German contract OCR: lower = faster, slightly less accurate.
 _OCR_DPI = 150
+_TESSERACT_CONFIG = "--oem 1 --psm 3"
+# Parallel OCR workers; capped to avoid CPU/memory thrashing in small containers.
+_MAX_OCR_WORKERS = max(1, min(4, os.cpu_count() or 2))
+
+# One OpenMP thread per Tesseract subprocess when OCR runs in parallel.
+os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 
 
 def has_text_content(pdf_path):
@@ -39,35 +49,77 @@ def has_text_content(pdf_path):
         return False
 
 
+def _render_all_pages(pdf_path: str) -> list[Image.Image]:
+    """Render every page from a single PDF open (full-document load)."""
+    doc = fitz.open(pdf_path)
+    matrix = fitz.Matrix(_OCR_DPI / 72, _OCR_DPI / 72)
+    images: list[Image.Image] = []
+    try:
+        for page in doc:
+            pix = page.get_pixmap(matrix=matrix, alpha=False)
+            images.append(pix.pil_image())
+    finally:
+        doc.close()
+    return images
+
+
+def _ocr_page(page_num: int, image: Image.Image) -> tuple[int, str]:
+    try:
+        gray = image.convert("L")
+        text = pytesseract.image_to_string(gray, lang="deu", config=_TESSERACT_CONFIG)
+        return page_num, text
+    finally:
+        image.close()
+
+
 def extract_text_with_ocr(pdf_path):
     """Extract text from scanned PDF using Tesseract OCR with German post-correction.
 
-    Loads all pages in a single convert_from_path call for speed (avoids repeated
-    PDF parsing / poppler process spawning). Images are closed after OCR to release
-    memory promptly.
+    Loads the full PDF once (all pages rendered into memory), then runs Tesseract
+    in parallel across pages. Sequential per-page OCR was the main bottleneck.
     """
-    extracted_text = ""
-    images = []
+    images: list[Image.Image] = []
     try:
-        images = convert_from_path(pdf_path, dpi=_OCR_DPI)
+        render_start = time.time()
+        images = _render_all_pages(pdf_path)
+        render_elapsed = time.time() - render_start
         num_pages = len(images)
+        workers = min(_MAX_OCR_WORKERS, num_pages)
+
         logger.info(
-            "Starting OCR for %d page(s) (dpi=%d, tesseract deu, full pdf load)",
+            "PDF rendered %d page(s) in %.2fs (dpi=%d, full load, pymupdf)",
             num_pages,
+            render_elapsed,
             _OCR_DPI,
         )
+        logger.info("Starting parallel OCR (%d worker(s), tesseract deu)", workers)
 
-        for page_num, image in enumerate(images, 1):
-            try:
+        ocr_start = time.time()
+        page_texts: dict[int, str] = {}
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(_ocr_page, page_num, image)
+                for page_num, image in enumerate(images, 1)
+            ]
+            for future in as_completed(futures):
+                page_num, text = future.result()
+                page_texts[page_num] = text
                 if page_num == 1 or page_num == num_pages or page_num % 5 == 0:
-                    logger.info("OCR page %d/%d starting...", page_num, num_pages)
-                text = pytesseract.image_to_string(image, lang="deu")
-                extracted_text += f"\n--- Page {page_num} ---\n{text}"
-            finally:
-                image.close()
+                    logger.info("OCR page %d/%d done", page_num, num_pages)
 
-        corrected_text = correct_german_ocr(extracted_text.strip())
-        return corrected_text
+        ocr_elapsed = time.time() - ocr_start
+        logger.info(
+            "OCR finished in %.2fs (render=%.2fs, workers=%d)",
+            ocr_elapsed,
+            render_elapsed,
+            workers,
+        )
+
+        extracted_text = "".join(
+            f"\n--- Page {page_num} ---\n{page_texts[page_num]}"
+            for page_num in range(1, num_pages + 1)
+        )
+        return correct_german_ocr(extracted_text.strip())
 
     except Exception as e:
         logger.error("Error during OCR processing: %s", e)
