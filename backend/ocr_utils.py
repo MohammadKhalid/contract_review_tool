@@ -57,7 +57,9 @@ def _render_all_pages(pdf_path: str) -> list[Image.Image]:
     try:
         for page in doc:
             pix = page.get_pixmap(matrix=matrix, alpha=False)
-            images.append(pix.pil_image())
+            images.append(
+                Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            )
     finally:
         doc.close()
     return images
