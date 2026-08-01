@@ -31,6 +31,22 @@ docker network create edge
 VoiceAgents must run with container name `voiceagents-api` on network `edge`
 (see chatecho `VoiceAgents/docker-compose.yml`).
 
+### “host not found in upstream voiceagents-api”
+
+Fixed in config by using Docker DNS (`resolver 127.0.0.11`) + a variable
+`proxy_pass` so nginx **starts even if VoiceAgents is down**. Those paths
+return **502** until the API is healthy.
+
+Still required for requests to work:
+
+```bash
+docker network create edge || true
+cd /path/to/chatecho/VoiceAgents && docker compose up -d
+# voiceagents-api must be on network edge:
+docker network connect edge voiceagents-api  # only if not already via compose
+docker network inspect edge
+```
+
 ## TLS (Contract Hero — unchanged)
 
 ```bash
