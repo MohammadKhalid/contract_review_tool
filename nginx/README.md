@@ -1,82 +1,95 @@
-# nginx reverse proxy for contract_review_tool (prod profile)
+# nginx reverse proxy (Contract Hero + VoiceAgents on one VPS)
 
-This directory is mounted by the `nginx` service in docker-compose.yml (prod profile only).
+## Routing
+
+| Request | Target |
+|---------|--------|
+| `https://contract-hero.com/` … | Contract Hero frontend / backend (unchanged) |
+| `https://contract-hero.com/docs` | Contract Hero Swagger |
+| `https://contract-hero.com/v1-docs` | **VoiceAgents** Swagger |
+| `https://contract-hero.com/v1/...` | **VoiceAgents** API |
+| `http://SERVER_IP/v1-docs` | **VoiceAgents** Swagger |
+| `http://SERVER_IP/v1/...` | **VoiceAgents** API |
+| `http://SERVER_IP/va-health` | **VoiceAgents** health |
+
+Frontend for ChatEcho is expected on **Vercel** (not this VPS).
 
 ## Files
-- `nginx.conf` — the main server config with proxy rules.
-- `certs/` — place your TLS material here (see below).
 
-## TLS / HTTPS (required for Polar production webhooks)
+- `nginx.conf` — server blocks (IP default + contract-hero.com)
+- `proxy-locations.conf` — Contract Hero routes (original)
+- `proxy-locations-voiceagents.conf` — `/v1`, `/v1-docs`, `/va-health`
+- `certs/` — TLS for contract-hero.com (`fullchain.pem`, `privkey.pem`)
 
-Polar requires a publicly reachable **HTTPS** URL for webhooks when `POLAR_SERVER=production`.
+## Prerequisites
 
-1. On the VPS obtain a cert (while the nginx container is not yet using port 80, or use DNS challenge):
-   ```bash
-   # stop nginx temporarily if it is holding port 80
-   docker compose --profile prod stop nginx
+```bash
+# Once on the VPS
+docker network create edge
+```
 
-   certbot certonly --standalone -d yourdomain.com --agree-tos -m you@example.com
-   # or for DNS:
-   # certbot certonly --manual --preferred-challenges dns -d yourdomain.com
-   ```
+VoiceAgents must run with container name `voiceagents-api` on network `edge`
+(see chatecho `VoiceAgents/docker-compose.yml`).
 
-2. Copy the certs into this directory:
-   ```bash
-   mkdir -p certs
-   cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem certs/
-   cp /etc/letsencrypt/live/yourdomain.com/privkey.pem   certs/
-   chmod 600 certs/*
-   ```
+## TLS (Contract Hero — unchanged)
 
-3. Edit `nginx/nginx.conf` and enable the 443 ssl server block (uncomment it and make sure the paths match `/etc/nginx/certs/...` — the volume mount makes the host certs/ visible at that path inside the container).
+```bash
+docker compose --profile prod stop nginx
 
-4. Restart:
-   ```bash
-   docker compose --profile prod restart nginx
-   ```
+certbot certonly --standalone -d contract-hero.com -d www.contract-hero.com \
+  --agree-tos -m you@example.com
 
-5. Test:
-   ```bash
-   curl -I https://yourdomain.com
-   curl -I https://yourdomain.com/health
-   ```
+mkdir -p certs
+cp /etc/letsencrypt/live/contract-hero.com/fullchain.pem certs/
+cp /etc/letsencrypt/live/contract-hero.com/privkey.pem   certs/
+chmod 600 certs/*
 
-6. In the Polar dashboard (production org) register / update the webhook to exactly:
-   ```
-   https://yourdomain.com/api/webhook/polar
-   ```
-   Copy the new secret into your server's `.env` as `POLAR_WEBHOOK_SECRET`, then:
-   ```bash
-   docker compose --profile prod up -d --build frontend
-   ```
+docker compose --profile prod up -d nginx
+```
 
-For quick http-only testing (before you have certs) you can leave the port-80 server block active and use a prod-like domain with a tunnel or just test the Polar sandbox flow.
+## Start order
 
-## Other notes
-- The config forwards `Host`, `X-Real-IP`, `X-Forwarded-*` so the Next.js and FastAPI apps see the real client IP and scheme.
-- You can increase `client_max_body_size` in the http {} or server {} block if you need to support very large PDF uploads.
-- Add security headers, rate limiting, etc. as needed.
-- If you later prefer Caddy (auto TLS via Let's Encrypt with almost zero config), replace the nginx service in docker-compose.yml with a caddy one + a root `Caddyfile`; only compose + one new file change.
+```bash
+docker network create edge || true
 
-## Accessing the Backend API Docs (Swagger UI / ReDoc) on prod
+# VoiceAgents only (API + DB)
+cd /path/to/chatecho/VoiceAgents
+docker compose up -d --build
 
-The FastAPI backend serves its interactive documentation at:
+# Contract Hero + nginx
+cd /path/to/contract_review_tool
+docker compose --profile prod up -d --build
+```
 
-- Swagger UI: `https://yourdomain.com/docs`
-- ReDoc: `https://yourdomain.com/redoc`
-- OpenAPI schema: `https://yourdomain.com/openapi.json`
+## Smoke tests
 
-These paths are proxied to the backend service (see the added `location /docs`, `/redoc`, `/openapi.json` blocks in `nginx.conf`).
+```bash
+# Contract Hero
+curl -I https://contract-hero.com
+curl -I https://contract-hero.com/health
+curl -I https://contract-hero.com/docs
 
-The docs page itself is public. When you click "Try it out" on an endpoint, you will need to provide a valid `X-API-Key` header (either your `ADMIN_API_KEY` or a one-time Polar license key).
+# VoiceAgents via IP
+curl -I http://SERVER_IP/v1-docs
+curl -I http://SERVER_IP/va-health
+curl -I http://SERVER_IP/v1/auth/signin   # expect 405 GET → method not allowed is fine
 
-Example (after login or with a valid key):
-- Go to https://yourdomain.com/docs
-- Expand an operation (e.g. POST /contracts/analyze)
-- Click "Try it out"
-- In the "X-API-Key" field, paste your key
-- Execute
+# VoiceAgents via domain (HTTPS — use this for Vercel)
+curl -I https://contract-hero.com/v1-docs
+curl -s https://contract-hero.com/va-health
+```
 
-Note: The "Authorize" button at the top of Swagger UI can also be used to set the API key globally for all operations.
+## Vercel frontend env
 
-After certs + webhook registration your public URL (`https://yourdomain.com`) is ready for real €2 Polar one-time purchases.
+```env
+NEXT_PUBLIC_API_URL=https://contract-hero.com/v1
+NEXTAUTH_URL=https://your-app.vercel.app
+```
+
+Use HTTPS + domain for the API from Vercel (browsers block mixed content if the site is HTTPS and API is bare `http://IP`).
+
+## Polar webhook (Contract Hero)
+
+```
+https://contract-hero.com/api/webhook/polar
+```
